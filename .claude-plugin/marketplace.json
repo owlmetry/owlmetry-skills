@@ -1,0 +1,21 @@
+{
+  "name": "owlmetry-skills",
+  "owner": {
+    "name": "OwlMetry",
+    "email": "noreply@owlmetry.com"
+  },
+  "metadata": {
+    "description": "Claude Code skills for OwlMetry — CLI, Node SDK, Swift SDK instrumentation"
+  },
+  "plugins": [
+    {
+      "name": "owlmetry",
+      "source": "./plugins/owlmetry",
+      "description": "Install the CLI, instrument iOS/macOS apps with the Swift SDK, and instrument Node.js services with the Node SDK",
+      "homepage": "https://owlmetry.com",
+      "repository": "https://github.com/owlmetry/owlmetry-skills",
+      "license": "MIT",
+      "keywords": ["owlmetry", "analytics", "sdk", "ios", "swift", "node", "cli"]
+    }
+  ]
+}
