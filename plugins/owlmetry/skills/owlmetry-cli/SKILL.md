@@ -1,17 +1,17 @@
 ---
 name: owlmetry-cli
 description: >-
-  Install the OwlMetry CLI, sign up, and manage projects, apps, metrics,
-  funnels, and events. Use when adding OwlMetry to a project, querying
-  analytics, or when another OwlMetry skill needs CLI setup as a prerequisite.
+  Install the Owlmetry CLI, sign up, and manage projects, apps, metrics,
+  funnels, and events. Use when adding Owlmetry to a project, querying
+  analytics, or when another Owlmetry skill needs CLI setup as a prerequisite.
   IMPORTANT: You MUST load this skill before running ANY `owlmetry` CLI
   command. The CLI has non-obvious subcommand syntax and flags — do not guess.
 allowed-tools: Bash
 ---
 
-## What is OwlMetry?
+## What is Owlmetry?
 
-OwlMetry is a self-hosted analytics platform for mobile and backend apps. It captures events, structured metrics, and funnel conversions from client SDKs (Swift, Node.js), stores them in a partitioned PostgreSQL database, and exposes query and management APIs.
+Owlmetry is a self-hosted analytics platform for mobile and backend apps. It captures events, structured metrics, and funnel conversions from client SDKs (Swift, Node.js), stores them in a partitioned PostgreSQL database, and exposes query and management APIs.
 
 The **CLI** is the management and query tool — it does not ingest events. You use it to create projects and apps, define metrics and funnels, query event data, and view analytics. SDKs handle event ingestion using client keys (`owl_client_...`). The CLI uses agent keys (`owl_agent_...`) for reading data and managing resources.
 
@@ -107,16 +107,16 @@ Pass the **ingest endpoint** and client key to the SDK's `configure()` call. Rea
 
 ### Step 5 — Add to project's CLAUDE.md
 
-Add this to the project's `CLAUDE.md` so future sessions know OwlMetry is integrated and load the right skills:
+Add this to the project's `CLAUDE.md` so future sessions know Owlmetry is integrated and load the right skills:
 
 ```markdown
-### OwlMetry
+### Owlmetry
 Load the `/owlmetry-cli` skill before running any `owlmetry` CLI commands or doing analytics work — it links to the appropriate SDK skill for your platform.
 ```
 
 ## Resource Hierarchy
 
-OwlMetry organises resources in a `Team → Project → Apps` hierarchy:
+Owlmetry organises resources in a `Team → Project → Apps` hierarchy:
 
 - **Team** — the top-level account. Users belong to one or more teams. All resources (projects, apps, keys) are team-scoped.
 - **Project** — groups related apps under one product (e.g., "MyApp" project). Metrics and funnels are defined at the project level so they span all apps in the project.
@@ -177,7 +177,7 @@ owlmetry funnels query <slug> --project-id <id> [--since <time>] [--until <time>
 owlmetry integrations providers
 owlmetry integrations list --project-id <id> --format json
 owlmetry integrations add revenuecat --project-id <id> --api-key <key> --format json
-owlmetry integrations add apple-search-ads --project-id <id> --format json  # OwlMetry generates the EC keypair; response's config.public_key_pem is what the user pastes into Apple
+owlmetry integrations add apple-search-ads --project-id <id> --format json  # Owlmetry generates the EC keypair; response's config.public_key_pem is what the user pastes into Apple
 owlmetry integrations update apple-search-ads --project-id <id> --client-id <SEARCHADS.*> --team-id <SEARCHADS.*> --key-id <key-id> --format json  # After the user pastes the public key into ads.apple.com and Apple returns the IDs
 owlmetry integrations update apple-search-ads --project-id <id> --org-id <org-id> --format json  # Finalize — auto-enables once all four IDs are present
 owlmetry integrations update <provider> --project-id <id> [provider-specific flags...] [--enable] [--disable] --format json
@@ -256,7 +256,7 @@ owlmetry apps update <id> --name <new-name> --format json
 
 ### Metric Definitions
 
-Metrics are project-scoped definitions that tell OwlMetry what structured data to expect from SDKs. There are two kinds:
+Metrics are project-scoped definitions that tell Owlmetry what structured data to expect from SDKs. There are two kinds:
 
 - **Lifecycle metrics** (`--lifecycle`): track operations with a start → complete/fail/cancel flow. Use for things with duration — API calls, uploads, database queries. The SDK auto-tracks `duration_ms`.
 - **Single-shot metrics** (no `--lifecycle`): record a point-in-time measurement. Use for snapshots — cache hit rates, queue depth, cold start time.
@@ -334,7 +334,7 @@ owlmetry integrations remove revenuecat --project-id <id>
 owlmetry integrations sync revenuecat --project-id <id>                      # Bulk sync (queues background job)
 owlmetry integrations sync revenuecat --project-id <id> --user <userId>      # Single user (synchronous)
 
-# Apple Search Ads — OwlMetry generates the EC P-256 keypair server-side. Three-step setup:
+# Apple Search Ads — Owlmetry generates the EC P-256 keypair server-side. Three-step setup:
 owlmetry integrations add apple-search-ads --project-id <id>                 # Step 1: server generates keypair, prints public key for user to upload to Apple
 owlmetry integrations update apple-search-ads --project-id <id> \            # Step 2: after user uploads public key and Apple returns IDs
     --client-id <SEARCHADS.*> --team-id <SEARCHADS.*> --key-id <id>
@@ -352,7 +352,7 @@ owlmetry integrations copy apple-search-ads --from <sourceProjectId> --to <targe
 
 **RevenueCat:** `--api-key` is a RevenueCat **V2 Secret API key** (Project Settings → API Keys → + New secret API key). Required permissions — set at the section level (top-right dropdown on each section), not per individual sub-row: **Customer information → Read only** AND **Project configuration → Read only**; all other sections → No access. A webhook secret is auto-generated. The output includes a **Webhook Setup** section with the exact values to paste into RevenueCat (Settings → Webhooks → + New Webhook): webhook URL, authorization header, environment, and events filter.
 
-**Apple Search Ads:** **OwlMetry generates the EC P-256 keypair server-side — never ask the user for a private key or an openssl command.** The three-step flow: (1) `integrations add apple-search-ads --project-id <id>` creates the integration and prints a public PEM. (2) The user invites (or reuses) an API user with role `API Account Read Only` at ads.apple.com → Account Settings → User Management, opens the API tab on that user, and pastes the public key there. Apple returns `clientId`, `teamId`, `keyId`. (3) The user runs `integrations update apple-search-ads` with the three IDs, then runs it again with `--org-id` (the numeric "Account ID" shown in the ads.apple.com profile menu). The integration auto-enables when all four IDs are present — do NOT pass `--enable`. To rotate the keypair, remove the integration and re-add; OwlMetry generates a new one and the user uploads the new public key to Apple (replacing the old one on the same API user). The v5 Campaign Management API is sunsetting **Jan 26, 2027** (replaced by a new Platform API Summer 2026) — this path will migrate when Apple publishes the new docs.
+**Apple Search Ads:** **Owlmetry generates the EC P-256 keypair server-side — never ask the user for a private key or an openssl command.** The three-step flow: (1) `integrations add apple-search-ads --project-id <id>` creates the integration and prints a public PEM. (2) The user invites (or reuses) an API user with role `API Account Read Only` at ads.apple.com → Account Settings → User Management, opens the API tab on that user, and pastes the public key there. Apple returns `clientId`, `teamId`, `keyId`. (3) The user runs `integrations update apple-search-ads` with the three IDs, then runs it again with `--org-id` (the numeric "Account ID" shown in the ads.apple.com profile menu). The integration auto-enables when all four IDs are present — do NOT pass `--enable`. To rotate the keypair, remove the integration and re-add; Owlmetry generates a new one and the user uploads the new public key to Apple (replacing the old one on the same API user). The v5 Campaign Management API is sunsetting **Jan 26, 2027** (replaced by a new Platform API Summer 2026) — this path will migrate when Apple publishes the new docs.
 
 Bulk sync creates a tracked background job. The response includes a `job_run_id` you can monitor:
 
@@ -500,7 +500,7 @@ Only one instance of each job type (per project) can be running or pending at a 
 
 ## MCP Endpoint (Alternative to CLI)
 
-Instead of installing the CLI, AI agents can connect directly to the OwlMetry server via MCP (Model Context Protocol). This exposes the same management and query capabilities as the CLI without requiring installation or updates — the tools are always in sync with the deployed server.
+Instead of installing the CLI, AI agents can connect directly to the Owlmetry server via MCP (Model Context Protocol). This exposes the same management and query capabilities as the CLI without requiring installation or updates — the tools are always in sync with the deployed server.
 
 ### Setup
 
@@ -552,7 +552,7 @@ The server also exposes an `owlmetry://guide` resource with the operational guid
 
 ## Typical Workflow
 
-A typical end-to-end flow for adding OwlMetry to a new project:
+A typical end-to-end flow for adding Owlmetry to a new project:
 
 1. **Sign up** (CLI): `owlmetry auth send-code` → verify code → team created, config saved
 2. **Create a project** (CLI): `owlmetry projects create --name "..." --slug "..." --format json`

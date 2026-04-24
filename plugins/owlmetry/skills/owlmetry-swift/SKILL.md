@@ -1,15 +1,15 @@
 ---
 name: owlmetry-swift
 description: >-
-  Integrate the OwlMetry Swift SDK into an iOS or macOS app for analytics,
+  Integrate the Owlmetry Swift SDK into an iOS or macOS app for analytics,
   event tracking, metrics, funnels, and A/B experiments. Use when
-  instrumenting a Swift or SwiftUI project with OwlMetry.
+  instrumenting a Swift or SwiftUI project with Owlmetry.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 
-## What is OwlMetry?
+## What is Owlmetry?
 
-OwlMetry is a self-hosted analytics platform. The Swift SDK captures events from iOS, iPadOS, and macOS apps and delivers them to the OwlMetry server. It handles buffering, gzip compression, offline queuing, session management, and network monitoring automatically — you just call logging methods and the SDK takes care of delivery.
+Owlmetry is a self-hosted analytics platform. The Swift SDK captures events from iOS, iPadOS, and macOS apps and delivers them to the Owlmetry server. It handles buffering, gzip compression, offline queuing, session management, and network monitoring automatically — you just call logging methods and the SDK takes care of delivery.
 
 The SDK is a static `Owl` enum with no external dependencies. All calls are non-blocking (events are buffered and flushed in batches). A single `configure()` call initialises everything.
 
@@ -54,7 +54,7 @@ dependencies: [
 Add to your target:
 ```swift
 .target(name: "YourApp", dependencies: [
-    .product(name: "OwlMetry", package: "owlmetry-swift")
+    .product(name: "Owlmetry", package: "owlmetry-swift")
 ])
 ```
 
@@ -62,7 +62,7 @@ Then run `swift package resolve` to fetch the dependency.
 
 ### Option B — Xcode projects (.xcodeproj)
 
-For `.xcodeproj`-based projects with no `Package.swift`, add the OwlMetry Swift package by editing `<Project>.xcodeproj/project.pbxproj` directly to add a remote Swift package reference for `https://github.com/owlmetry/owlmetry-swift.git` pinning `kind = upToNextMajorVersion` from the tag you fetched (e.g. `minimumVersion = 0.1.0`), product: `OwlMetry`. Do not ask the user to add it manually in Xcode.
+For `.xcodeproj`-based projects with no `Package.swift`, add the Owlmetry Swift package by editing `<Project>.xcodeproj/project.pbxproj` directly to add a remote Swift package reference for `https://github.com/owlmetry/owlmetry-swift.git` pinning `kind = upToNextMajorVersion` from the tag you fetched (e.g. `minimumVersion = 0.1.0`), product: `Owlmetry`. Do not ask the user to add it manually in Xcode.
 
 ### Option C — Ask the user (last resort)
 
@@ -71,7 +71,7 @@ If pbxproj editing fails or the project structure is too complex, ask the user t
 1. File > Add Package Dependencies
 2. Enter URL: `https://github.com/owlmetry/owlmetry-swift.git`
 3. Set rule to **Up to Next Major Version** starting at the tag from the fetch above (e.g. `0.1.0`)
-4. Add **OwlMetry** to the app target
+4. Add **Owlmetry** to the app target
 
 ## Verify Package Integration
 
@@ -82,14 +82,14 @@ xcodebuild -resolvePackageDependencies -project <path>.xcodeproj -quiet
 xcodebuild -project <path>.xcodeproj -scheme <SchemeName> -destination 'platform=iOS Simulator,name=iPhone 16' build -quiet
 ```
 
-If the build succeeds, proceed with configuration. The "No such module 'OwlMetry'" warning in editors (SourceKit) is expected and resolves during a real `xcodebuild`.
+If the build succeeds, proceed with configuration. The "No such module 'Owlmetry'" warning in editors (SourceKit) is expected and resolves during a real `xcodebuild`.
 
 ## Configure
 
 Configuration must happen once, as early as possible — in the `@main` App `init()` or AppDelegate `didFinishLaunching`. **Do not defer it** to a later point (e.g., after async setup or user consent). The SDK measures app launch time (`_launch_ms`) from process start to the `configure()` call, so placing it early gives an accurate cold-start metric. It also ensures no events are dropped before configuration. Each `configure()` call generates a fresh `session_id` (UUID) that groups all subsequent events together.
 
 ```swift
-import OwlMetry
+import Owlmetry
 
 @main
 struct MyApp: App {
@@ -100,7 +100,7 @@ struct MyApp: App {
                 apiKey: "owl_client_..."
             )
         } catch {
-            print("OwlMetry configuration failed: \(error)")
+            print("Owlmetry configuration failed: \(error)")
         }
     }
     // ...
@@ -196,13 +196,13 @@ try Owl.configure(
 
 **Log levels:** `.info` for 2xx/3xx responses, `.warn` for 4xx/5xx, `.error` for network failures (no response).
 
-**Safety:** The SDK's own requests to the OwlMetry ingest endpoint are automatically filtered out. Query parameters are stripped from URLs to prevent accidental logging of tokens or user IDs.
+**Safety:** The SDK's own requests to the Owlmetry ingest endpoint are automatically filtered out. Query parameters are stripped from URLs to prevent accidental logging of tokens or user IDs.
 
 **Coverage:** Tracks requests made with `URLSession.dataTask(with:completionHandler:)` (both URL and URLRequest overloads). Delegate-based and async/await requests are not tracked in this version.
 
 ## Log Events
 
-Events are the core unit of data in OwlMetry. Use the four log levels to capture different kinds of information:
+Events are the core unit of data in Owlmetry. Use the four log levels to capture different kinds of information:
 
 - **`info`** — normal operations worth recording: screen views, user actions, feature usage, successful completions. This is your default level.
 - **`debug`** — verbose detail useful only during development: cache hits, state transitions, intermediate values. These are filtered out in production data mode.
@@ -419,7 +419,7 @@ Owl.recordMetric("app-cold-start", attributes: ["screen": "home"])
 
 ## A/B Experiments
 
-OwlMetry provides lightweight client-side A/B testing. The flow is:
+Owlmetry provides lightweight client-side A/B testing. The flow is:
 
 1. **Assign a variant**: `getVariant("experiment-name", options: ["control", "variant-a"])` randomly picks a variant on first call.
 2. **Render conditionally**: use the returned variant string to show different UI.
@@ -463,7 +463,7 @@ Use for user-level data that changes infrequently (subscription status, plan tie
 **RevenueCat integration prompt** — copy-paste to set up subscription tracking:
 
 ```
-Connect RevenueCat to my OwlMetry project so I can see paid vs free users:
+Connect RevenueCat to my Owlmetry project so I can see paid vs free users:
 
 1. Use `/owlmetry-cli` to add the RevenueCat integration with my RC V2 secret API key
    (needs Customer information → Read only AND Project configuration → Read only at the section level, everything else No access).
@@ -476,7 +476,7 @@ Connect RevenueCat to my OwlMetry project so I can see paid vs free users:
 
 ## Apple Search Ads Attribution
 
-OwlMetry auto-captures Apple Search Ads attribution on `Owl.configure()` — no code required. On the first launch after install, the SDK calls `AAAttribution.attributionToken()` (iOS 14.3+) in a background task, submits the token to OwlMetry, and the server resolves it with Apple's public Attribution API. Once captured (attributed or not), the result is cached per-install so it runs exactly once.
+Owlmetry auto-captures Apple Search Ads attribution on `Owl.configure()` — no code required. On the first launch after install, the SDK calls `AAAttribution.attributionToken()` (iOS 14.3+) in a background task, submits the token to Owlmetry, and the server resolves it with Apple's public Attribution API. Once captured (attributed or not), the result is cached per-install so it runs exactly once.
 
 On successful attribution the user picks up:
 - `attribution_source = "apple_search_ads"` (cross-network — future Meta/Google support writes `meta`/`google_ads` into the same key)
@@ -485,7 +485,7 @@ On successful attribution the user picks up:
 
 An install Apple did not attribute gets `attribution_source = "none"` and nothing else.
 
-Human-readable names (`asa_campaign_name`, `asa_ad_group_name`, `asa_keyword`, `asa_ad_name`) come from either the **Apple Search Ads integration** (first-party; OwlMetry resolves every attributed user via Apple's Campaign Management API — configured per-project in the dashboard with OAuth credentials) or the **RevenueCat integration** (RC resolves the same names server-side and exposes them as subscriber attributes; bulk sync enriches every attributed user in RC, while RC's webhook delivery only fires on subscription events so free users only get enrichment through sync). Both sources are per-field merged — they never overwrite each other or the numeric IDs the SDK writes.
+Human-readable names (`asa_campaign_name`, `asa_ad_group_name`, `asa_keyword`, `asa_ad_name`) come from either the **Apple Search Ads integration** (first-party; Owlmetry resolves every attributed user via Apple's Campaign Management API — configured per-project in the dashboard with OAuth credentials) or the **RevenueCat integration** (RC resolves the same names server-side and exposes them as subscriber attributes; bulk sync enriches every attributed user in RC, while RC's webhook delivery only fires on subscription events so free users only get enrichment through sync). Both sources are per-field merged — they never overwrite each other or the numeric IDs the SDK writes.
 
 **Opt-out:** set `attributionEnabled: false` when configuring:
 
@@ -497,7 +497,7 @@ try Owl.configure(
 )
 ```
 
-**Manual submission:** apps that run their own token fetch can hand the token off to OwlMetry:
+**Manual submission:** apps that run their own token fetch can hand the token off to Owlmetry:
 
 ```swift
 await Owl.sendAppleSearchAdsAttributionToken(myCapturedToken)
@@ -513,7 +513,7 @@ Normal apps should not need to call this — the auto-capture on `configure()` c
 - Apple's attribution record may take up to ~24h to populate after install. The SDK retries across launches and gives up after 5 pending responses (writes `attribution_source = "none"`).
 - In the iOS simulator `AAAttribution.attributionToken()` throws `platformNotSupported` — set `OWLMETRY_MOCK_ADSERVICES_TOKEN` in the scheme's environment (DEBUG only) to mock a token.
 
-**Debug via OwlMetry itself:** every capture attempt emits an `sdk:attribution_capture` event so you can see success/fail from the dashboard without attaching a debugger. Attributes:
+**Debug via Owlmetry itself:** every capture attempt emits an `sdk:attribution_capture` event so you can see success/fail from the dashboard without attaching a debugger. Attributes:
 
 | `_outcome` | Level | Extra attributes | When |
 |---|---|---|---|
@@ -522,13 +522,13 @@ Normal apps should not need to call this — the auto-capture on `configure()` c
 | `gave_up` | warn | `_attempts` | Hit the 5-pending cap; wrote `attribution_source = "none"` |
 | `token_fetch_failed` | warn | `_error` | `AAAttribution.attributionToken()` threw on-device |
 | `invalid_token` | error | — | Apple rejected the token (400); never retried |
-| `transport_failure` | error | — | OwlMetry POST failed after all transport retries |
+| `transport_failure` | error | — | Owlmetry POST failed after all transport retries |
 
 Filter the dashboard Events list by `sdk:attribution_capture` (and optionally level) to spot install cohorts where capture never succeeds.
 
 ## Collect User Feedback
 
-OwlMetry ships a reusable SwiftUI view (`OwlFeedbackView`) plus a programmatic API (`Owl.sendFeedback`) for gathering free-text feedback inside your app. Submissions are linked automatically to the current session, user id, app version, device, and environment — nothing extra to pass in.
+Owlmetry ships a reusable SwiftUI view (`OwlFeedbackView`) plus a programmatic API (`Owl.sendFeedback`) for gathering free-text feedback inside your app. Submissions are linked automatically to the current session, user id, app version, device, and environment — nothing extra to pass in.
 
 ### Programmatic submit
 

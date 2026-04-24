@@ -1,6 +1,6 @@
-# OwlMetry Skills
+# Owlmetry Skills
 
-[Claude Code](https://claude.com/claude-code) plugin marketplace for [OwlMetry](https://owlmetry.com) — the self-hosted analytics platform for mobile and backend apps.
+[Claude Code](https://claude.com/claude-code) plugin marketplace for [Owlmetry](https://owlmetry.com) — the self-hosted analytics platform for mobile and backend apps.
 
 ## Install
 
@@ -20,7 +20,7 @@ The `owlmetry` plugin installs three skills:
 | Skill | Use when |
 |-------|----------|
 | `owlmetry-cli` | Signing up, creating projects and apps, defining metrics and funnels, querying events, triaging issues and feedback from the command line. |
-| `owlmetry-swift` | Instrumenting an iOS, iPadOS, or macOS app with the [OwlMetry Swift SDK](https://github.com/owlmetry/owlmetry-swift). |
+| `owlmetry-swift` | Instrumenting an iOS, iPadOS, or macOS app with the [Owlmetry Swift SDK](https://github.com/owlmetry/owlmetry-swift). |
 | `owlmetry-node` | Instrumenting a Node.js backend (Express, Fastify, serverless) with the [`@owlmetry/node`](https://www.npmjs.com/package/@owlmetry/node) SDK. |
 
 The CLI skill is the entry point — it handles auth, project/app creation, and knows how to hand off to the SDK skills once an app exists.

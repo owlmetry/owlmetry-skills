@@ -1,15 +1,15 @@
 ---
 name: owlmetry-node
 description: >-
-  Integrate the OwlMetry Node.js SDK into a backend service for server-side
+  Integrate the Owlmetry Node.js SDK into a backend service for server-side
   analytics, event tracking, metrics, funnels, and A/B experiments. Use when
-  instrumenting a Node.js, Express, Fastify, or serverless project with OwlMetry.
+  instrumenting a Node.js, Express, Fastify, or serverless project with Owlmetry.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 
-## What is OwlMetry?
+## What is Owlmetry?
 
-OwlMetry is a self-hosted analytics platform. The Node.js SDK captures events from backend services — API servers, job workers, serverless functions — and delivers them to the OwlMetry server. It buffers events in memory and flushes them in batches to avoid blocking your application's request path.
+Owlmetry is a self-hosted analytics platform. The Node.js SDK captures events from backend services — API servers, job workers, serverless functions — and delivers them to the Owlmetry server. It buffers events in memory and flushes them in batches to avoid blocking your application's request path.
 
 The SDK has zero runtime dependencies. All calls are non-blocking — events are buffered internally and sent in the background. A single `Owl.configure()` call initialises everything including a background flush timer.
 
@@ -337,7 +337,7 @@ Use for user-level data that changes infrequently (subscription status, plan tie
 **RevenueCat integration prompt** — copy-paste to set up subscription tracking:
 
 ```
-Connect RevenueCat to my OwlMetry project so I can see paid vs free users:
+Connect RevenueCat to my Owlmetry project so I can see paid vs free users:
 
 1. Use `/owlmetry-cli` to add the RevenueCat integration with my RC V2 secret API key
    (needs Customer information → Read only AND Project configuration → Read only at the section level, everything else No access).
@@ -350,7 +350,7 @@ Connect RevenueCat to my OwlMetry project so I can see paid vs free users:
 
 ## User Feedback
 
-Forward free-text feedback collected by your own frontend (form, chat widget, support page) into the OwlMetry feedback tracker. Use this when your Node server is the pass-through between the end user and OwlMetry.
+Forward free-text feedback collected by your own frontend (form, chat widget, support page) into the Owlmetry feedback tracker. Use this when your Node server is the pass-through between the end user and Owlmetry.
 
 ```typescript
 try {
@@ -425,7 +425,7 @@ process.on('SIGTERM', async () => {
 
 ## Integration Patterns
 
-These patterns show how to wire OwlMetry into common Node.js frameworks. The key ideas:
+These patterns show how to wire Owlmetry into common Node.js frameworks. The key ideas:
 - **Create a scoped logger in auth middleware** so all route handlers get user-attributed events automatically.
 - **Use `wrapHandler()` on critical routes** where losing events is unacceptable.
 - **Call `shutdown()` in the framework's close hook** to flush on process termination.
