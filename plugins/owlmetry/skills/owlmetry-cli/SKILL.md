@@ -189,7 +189,7 @@ owlmetry integrations sync <provider> --project-id <id> [--user <userId>] --form
 # Issues
 owlmetry issues list --project-id <id> [--status new|in_progress|resolved|silenced|regressed] [--app-id <id>] [--dev] [--limit <n>] --format json
 owlmetry issues view <issueId> --project-id <id> --format json
-owlmetry issues resolve <issueId> --project-id <id> [--version <v>] --format json
+owlmetry issues resolve <issueId> --project-id <id> --version <v> --format json
 owlmetry issues silence <issueId> --project-id <id> --format json
 owlmetry issues reopen <issueId> --project-id <id> --format json
 owlmetry issues claim <issueId> --project-id <id> --format json
@@ -386,8 +386,8 @@ Every app row carries `latest_app_version`, `latest_app_version_updated_at`, and
 ```bash
 owlmetry issues list --project-id <id> [--status new] [--app-id <id>] [--dev] --format json
 owlmetry issues view <issueId> --project-id <id> --format json              # Detail with occurrences + comments
-owlmetry issues resolve <issueId> --project-id <id> --version 2.1.0         # Resolve with fix version
-owlmetry issues silence <issueId> --project-id <id>                          # Suppress notifications
+owlmetry issues resolve <issueId> --project-id <id> --version 2.1.0         # Resolve (--version required — powers regression detection)
+owlmetry issues silence <issueId> --project-id <id>                          # Suppress notifications (use this if no fix version)
 owlmetry issues reopen <issueId> --project-id <id>                           # Reopen
 owlmetry issues claim <issueId> --project-id <id>                            # Set to in_progress
 owlmetry issues merge <targetId> --project-id <id> --source <sourceId>       # Merge two issues
