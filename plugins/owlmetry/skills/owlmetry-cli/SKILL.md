@@ -180,11 +180,14 @@ owlmetry integrations add revenuecat --project-id <id> --api-key <key> --format 
 owlmetry integrations add apple-search-ads --project-id <id> --format json  # Owlmetry generates the EC keypair; response's config.public_key_pem is what the user pastes into Apple
 owlmetry integrations update apple-search-ads --project-id <id> --client-id <SEARCHADS.*> --team-id <SEARCHADS.*> --key-id <key-id> --format json  # After the user pastes the public key into ads.apple.com and Apple returns the IDs
 owlmetry integrations update apple-search-ads --project-id <id> --org-id <org-id> --format json  # Finalize — auto-enables once all four IDs are present
+owlmetry integrations add app-store-connect --project-id <id> --issuer-id <uuid> --key-id <ABC1234567> --private-key-p8-file ./AuthKey_*.p8 --format json  # Reviews integration. .p8 from App Store Connect → Users and Access → Integrations (Customer Support role)
+owlmetry integrations update app-store-connect --project-id <id> [--issuer-id <uuid>] [--key-id <id>] [--private-key-p8-file ./new.p8] --format json  # Omit --private-key-p8-file to keep the existing .p8
 owlmetry integrations update <provider> --project-id <id> [provider-specific flags...] [--enable] [--disable] --format json
-owlmetry integrations test apple-search-ads --project-id <id>  # Verify creds via /api/v5/acls
+owlmetry integrations test apple-search-ads --project-id <id>  # Verify ASA creds via /api/v5/acls
+owlmetry integrations test app-store-connect --project-id <id>  # Verify ASC creds + list visible apps
 owlmetry integrations remove <provider> --project-id <id>
-owlmetry integrations copy <provider> --from <sourceProjectId> --to <targetProjectId> --format json  # Duplicate credentials from another project in the same team
-owlmetry integrations sync <provider> --project-id <id> [--user <userId>] --format json
+owlmetry integrations copy <provider> --from <sourceProjectId> --to <targetProjectId> --format json  # Duplicate credentials from another project in the same team. Supported: revenuecat, apple-search-ads, app-store-connect
+owlmetry integrations sync <provider> --project-id <id> [--user <userId>] --format json  # --user not supported for app-store-connect (reviews are app-scoped)
 
 # Issues
 owlmetry issues list --project-id <id> [--status new|in_progress|resolved|silenced|regressed] [--app-id <id>] [--dev] [--limit <n>] --format json
@@ -204,11 +207,15 @@ owlmetry feedback status <feedbackId> --project-id <id> --to new|in_review|addre
 owlmetry feedback comment <feedbackId> --project-id <id> --body "..." --format json
 owlmetry feedback delete <feedbackId> --project-id <id>  # user-only; agent keys get 403
 
-# Store reviews (App Store / Play Store — Apple-only ingest currently)
+# Store reviews (text reviews — App Store / Play Store, Apple-only ingest currently)
 owlmetry reviews list --project-id <id> [--app-id <id>] [--store app_store|play_store] [--rating <1-5>] [--rating-lte <n>] [--rating-gte <n>] [--country <cc>] [--has-response | --no-response] [--search <text>] [--limit <n>] --format json
 owlmetry reviews view <reviewId> --project-id <id> --format json
-owlmetry reviews by-country --project-id <id> [--app-id <id>] [--store app_store|play_store] --format json
 owlmetry reviews delete <reviewId> --project-id <id>  # user-only; agent keys get 403
+
+# Store ratings (per-country aggregates, includes star-only ratings — full population, not just text reviews)
+owlmetry ratings list <appId> --project-id <id> [--store app_store|play_store] --format json   # Per-country breakdown + worldwide summary for one app
+owlmetry ratings by-country --project-id <id> [--app-id <id>] [--store app_store|play_store] --format json   # Aggregate per-country across every app in a project
+owlmetry ratings sync --project-id <id> --format json   # Manual sync (admin-only); auto-syncs daily 04:30 UTC
 
 # Events
 owlmetry events [--project-id <id>] [--app-id <id>] [--level <level>] [--user-id <id>] [--session-id <id>] [--since <time>] [--limit <n>] [--order asc|desc] --format json
