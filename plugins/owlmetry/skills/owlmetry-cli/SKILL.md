@@ -204,6 +204,12 @@ owlmetry feedback status <feedbackId> --project-id <id> --to new|in_review|addre
 owlmetry feedback comment <feedbackId> --project-id <id> --body "..." --format json
 owlmetry feedback delete <feedbackId> --project-id <id>  # user-only; agent keys get 403
 
+# Store reviews (App Store / Play Store — Apple-only ingest currently)
+owlmetry reviews list --project-id <id> [--app-id <id>] [--store app_store|play_store] [--rating <1-5>] [--rating-lte <n>] [--rating-gte <n>] [--country <cc>] [--has-response | --no-response] [--search <text>] [--limit <n>] --format json
+owlmetry reviews view <reviewId> --project-id <id> --format json
+owlmetry reviews by-country --project-id <id> [--app-id <id>] [--store app_store|play_store] --format json
+owlmetry reviews delete <reviewId> --project-id <id>  # user-only; agent keys get 403
+
 # Events
 owlmetry events [--project-id <id>] [--app-id <id>] [--level <level>] [--user-id <id>] [--session-id <id>] [--since <time>] [--limit <n>] [--order asc|desc] --format json
 owlmetry events view <id> --format json
