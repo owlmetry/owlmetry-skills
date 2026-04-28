@@ -521,7 +521,7 @@ Normal apps should not need to call this — the auto-capture on `configure()` c
 | `pending` | info | `_attempt`, `_max_attempts` | Apple 404 — record not ready, will retry next launch |
 | `gave_up` | warn | `_attempts` | Hit the 5-pending cap; wrote `attribution_source = "none"` |
 | `token_fetch_failed` | warn | `_error` | `AAAttribution.attributionToken()` threw on-device |
-| `invalid_token` | error | — | Apple rejected the token (400); never retried |
+| `invalid_token` | warn | — | Owlmetry rejected the token as empty/malformed; never retried. Common steady state in regions where AdServices is unavailable. |
 | `transport_failure` | error | — | Owlmetry POST failed after all transport retries |
 
 Filter the dashboard Events list by `sdk:attribution_capture` (and optionally level) to spot install cohorts where capture never succeeds.
