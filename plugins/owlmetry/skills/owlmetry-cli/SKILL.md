@@ -412,7 +412,7 @@ owlmetry issues comments <issueId> --project-id <id> --format json           # L
 
 **Merging**: If two issues are actually the same problem (different normalization), merge them. All fingerprints, occurrences, and comments move to the target issue.
 
-**Notifications**: Each hourly scan also fires an instant `issue.new` notification per team summarizing newly-created and regressed *production* issues from that run — defaults to in-app + iOS push (email off), per-user toggleable in dashboard preferences. Separately, the per-project email digest (`issue.digest`) cadence is configurable via `owlmetry projects update <id> --issue-alert-frequency daily`. Options: `none`, `hourly`, `6_hourly`, `daily`, `weekly`.
+**Notifications**: Each hourly scan also fires an instant `issue.new` notification per team summarizing newly-created and regressed *production* issues from that run — defaults to in-app + mobile push (email off), per-user toggleable in dashboard preferences. Separately, the per-project email digest (`issue.digest`) cadence is configurable via `owlmetry projects update <id> --issue-alert-frequency daily`. Options: `none`, `hourly`, `6_hourly`, `daily`, `weekly`.
 
 ## Querying
 
