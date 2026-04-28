@@ -130,7 +130,7 @@ try {
 
 All methods: `Owl.info/debug/warn/error(message, attrs?, options?)`. The third `options` argument supports `{ attachments }` for uploading files alongside the event — see *File Attachments* below.
 
-Source module (file:line) is auto-captured from the call stack. A `country_code` (ISO-3166 alpha-2) is stamped server-side from the ingest request's `CF-IPCountry` header — the SDK does not send it.
+Source module (file:line) is auto-captured from the call stack. `country_code` is **always `null`** for events from this SDK — the app's `platform` is `backend`, and the request reaches Owlmetry from the customer's hosting datacenter rather than an end user, so capturing the Cloudflare-derived country would be misleading. If you need per-user geography on backend events, attach it as a custom attribute on the event or as a user property.
 
 **Backend-specific examples:**
 ```typescript
