@@ -210,7 +210,6 @@ owlmetry feedback delete <feedbackId> --project-id <id>  # user-only; agent keys
 # Store reviews (text reviews — App Store / Play Store, Apple-only ingest currently)
 owlmetry reviews list --project-id <id> [--app-id <id>] [--store app_store|play_store] [--rating <1-5>] [--rating-lte <n>] [--rating-gte <n>] [--country <cc>] [--has-response | --no-response] [--search <text>] [--limit <n>] --format json
 owlmetry reviews view <reviewId> --project-id <id> --format json
-owlmetry reviews delete <reviewId> --project-id <id>  # user-only; agent keys get 403
 # Reply round-trip — sends to App Store Connect; reply becomes publicly visible on the App Store listing.
 # Requires the project to have an active App Store Connect integration (Customer Support role or higher).
 # Body length capped at 5970 (Apple's limit). Edit = re-run respond with new --body; ASC has no PATCH so
