@@ -211,6 +211,14 @@ owlmetry feedback delete <feedbackId> --project-id <id>  # user-only; agent keys
 owlmetry reviews list --project-id <id> [--app-id <id>] [--store app_store|play_store] [--rating <1-5>] [--rating-lte <n>] [--rating-gte <n>] [--country <cc>] [--has-response | --no-response] [--search <text>] [--limit <n>] --format json
 owlmetry reviews view <reviewId> --project-id <id> --format json
 owlmetry reviews delete <reviewId> --project-id <id>  # user-only; agent keys get 403
+# Reply round-trip — sends to App Store Connect; reply becomes publicly visible on the App Store listing.
+# Requires the project to have an active App Store Connect integration (Customer Support role or higher).
+# Body length capped at 5970 (Apple's limit). Edit = re-run respond with new --body; ASC has no PATCH so
+# Owlmetry implements edit as DELETE+POST internally.
+owlmetry reviews respond <reviewId> --project-id <id> --body "..." --format json
+owlmetry reviews respond <reviewId> --project-id <id> --body-file path/to/reply.txt --format json   # use - for stdin
+# ⚠️ Destructive: removes the public reply from the App Store. --yes is required.
+owlmetry reviews delete-response <reviewId> --project-id <id> --yes --format json
 
 # Store ratings (per-country aggregates, includes star-only ratings — full population, not just text reviews)
 owlmetry ratings list <appId> --project-id <id> [--store app_store|play_store] --format json   # Per-country breakdown + worldwide summary for one app
@@ -534,7 +542,7 @@ Add this to your MCP client configuration (Claude Desktop, Cursor, VS Code, etc.
 
 For self-hosted instances, replace `api.owlmetry.com` with your server's domain. The endpoint is at `/mcp` on the same Fastify server.
 
-### Available Tools (47)
+### Available Tools (63)
 
 | Domain | Tools |
 |--------|-------|
@@ -545,6 +553,8 @@ For self-hosted instances, replace `api.owlmetry.com` with your server's domain.
 | Metrics | `list-metrics`, `get-metric`, `create-metric`, `update-metric`, `delete-metric`, `query-metric`, `list-metric-events` |
 | Funnels | `list-funnels`, `get-funnel`, `create-funnel`, `update-funnel`, `delete-funnel`, `query-funnel` |
 | Issues | `list-issues`, `get-issue`, `resolve-issue`, `silence-issue`, `reopen-issue`, `claim-issue`, `merge-issues`, `list-issue-comments`, `add-issue-comment` |
+| Reviews | `list-reviews`, `get-review`, `respond-to-review`, `delete-review-response` (⚠️ destructive — removes the public reply on Apple's side) |
+| Ratings | `list-app-ratings`, `list-ratings-by-country`, `sync-app-ratings` |
 | Integrations | `list-providers`, `list-integrations`, `add-integration`, `update-integration`, `remove-integration`, `copy-integration`, `sync-integration` |
 | Jobs | `list-jobs`, `get-job`, `trigger-job`, `cancel-job` |
 | Audit Logs | `list-audit-logs` |
