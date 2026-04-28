@@ -674,6 +674,7 @@ Every event automatically includes:
 - `experiments` — current A/B experiment assignments
 - `environment` — specific runtime (ios, ipados, macos)
 - `country_code` — ISO-3166 alpha-2 country, stamped server-side from the ingest request (SDK does not send this)
+- `sdk_name` (`"owlmetry-swift"`) and `sdk_version` (the resolved SPM tag) — auto-stamped on every event and feedback submission. **Do not set these manually** — they're managed by the SDK so the server can tell which SDK and version produced each event.
 
 **Auto-emitted lifecycle events** (no manual calls needed):
 - `sdk:session_started` — on `configure()`, includes `_launch_ms` (time from process start to configure)

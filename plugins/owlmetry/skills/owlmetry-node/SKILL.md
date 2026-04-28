@@ -132,6 +132,8 @@ All methods: `Owl.info/debug/warn/error(message, attrs?, options?)`. The third `
 
 Source module (file:line) is auto-captured from the call stack. `country_code` is **always `null`** for events from this SDK — the app's `platform` is `backend`, and the request reaches Owlmetry from the customer's hosting datacenter rather than an end user, so capturing the Cloudflare-derived country would be misleading. If you need per-user geography on backend events, attach it as a custom attribute on the event or as a user property.
 
+`sdk_name` (`"owlmetry-node"`) and `sdk_version` (read from the package's `package.json` at build time) are auto-stamped on every event and feedback submission. **Do not set these manually** — they're managed by the SDK so the server can tell which SDK and version produced each event.
+
 **Backend-specific examples:**
 ```typescript
 Owl.info('Request handled', { method: 'POST', path: '/api/orders', status: 201 });
