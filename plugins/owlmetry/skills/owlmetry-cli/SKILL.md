@@ -190,10 +190,11 @@ owlmetry integrations copy <provider> --from <sourceProjectId> --to <targetProje
 owlmetry integrations sync <provider> --project-id <id> [--user <userId>] --format json  # --user not supported for app-store-connect (reviews are app-scoped)
 
 # Issues
-owlmetry issues list --project-id <id> [--status new|in_progress|resolved|silenced|regressed] [--app-id <id>] [--dev] [--limit <n>] --format json
+owlmetry issues list --project-id <id> [--status new|in_progress|resolved|silenced|regressed|snoozed] [--app-id <id>] [--dev] [--limit <n>] --format json
 owlmetry issues view <issueId> --project-id <id> --format json
 owlmetry issues resolve <issueId> --project-id <id> --version <v> --format json
-owlmetry issues silence <issueId> --project-id <id> --format json
+owlmetry issues silence <issueId> --project-id <id> --format json  # Stays silenced even if it recurs
+owlmetry issues snooze <issueId> --project-id <id> --format json   # Auto-reopens to 'new' on next occurrence (use for suspected one-offs)
 owlmetry issues reopen <issueId> --project-id <id> --format json
 owlmetry issues claim <issueId> --project-id <id> --format json
 owlmetry issues merge <targetIssueId> --project-id <id> --source <sourceIssueId> --format json
@@ -395,7 +396,7 @@ owlmetry jobs trigger revenuecat_sync --team-id <id> --project-id <id> --wait
 
 Issues are automatically created by an hourly background scan that detects error-level events, deduplicates them by fingerprint (normalized message + source module), and groups related occurrences. Each issue tracks affected sessions, unique users, and app versions.
 
-**Status lifecycle:** `new` → `in_progress` (claimed by agent/user) → `resolved` (optionally with version) → may `regress` if the error reappears in a newer app version. Issues can be `silenced` to stop notifications while still tracking occurrences.
+**Status lifecycle:** `new` → `in_progress` (claimed by agent/user) → `resolved` (optionally with version) → may `regress` if the error reappears in a newer app version. Two off-ramps stop notifications without claiming a fix: `silenced` (terminal — stays silent even if the error keeps happening; use for transient infra blips you've decided to live with) and `snoozed` (auto-reverts to `new` and re-fires the `issue.new` push on the very next occurrence; use when you suspect a one-off and only want to be alerted if the assumption turns out wrong).
 
 **Latest version flag:** Each issue includes `last_seen_app_version` and `first_seen_app_version` (denormalised from occurrences). To tell whether an issue is still happening on the current release, compare `last_seen_app_version` against the corresponding app's `latest_app_version` using the shared semver-aware comparator (handles `v` prefix and `(build)` suffix; equality is enough to flag "on latest"). The CLI's `issues list` and `issues view` colour the version green when it matches the app's latest, yellow when it differs.
 
@@ -407,8 +408,9 @@ Every app row carries `latest_app_version`, `latest_app_version_updated_at`, and
 owlmetry issues list --project-id <id> [--status new] [--app-id <id>] [--dev] --format json
 owlmetry issues view <issueId> --project-id <id> --format json              # Detail with occurrences + comments
 owlmetry issues resolve <issueId> --project-id <id> --version 2.1.0         # Resolve (--version required — powers regression detection)
-owlmetry issues silence <issueId> --project-id <id>                          # Suppress notifications (use this if no fix version)
-owlmetry issues reopen <issueId> --project-id <id>                           # Reopen
+owlmetry issues silence <issueId> --project-id <id>                          # Suppress notifications, stays silenced even if it recurs (use for "don't want to hear about it again")
+owlmetry issues snooze <issueId> --project-id <id>                           # Like silence but auto-reopens to 'new' on next occurrence (use for suspected one-offs)
+owlmetry issues reopen <issueId> --project-id <id>                           # Reopen (resolved/silenced/snoozed → new)
 owlmetry issues claim <issueId> --project-id <id>                            # Set to in_progress
 owlmetry issues merge <targetId> --project-id <id> --source <sourceId>       # Merge two issues
 owlmetry issues comment <issueId> --project-id <id> --body "Root cause: ..."  # Add investigation note
@@ -551,7 +553,7 @@ For self-hosted instances, replace `api.owlmetry.com` with your server's domain.
 | Events | `query-events`, `get-event`, `investigate-event` |
 | Metrics | `list-metrics`, `get-metric`, `create-metric`, `update-metric`, `delete-metric`, `query-metric`, `list-metric-events` |
 | Funnels | `list-funnels`, `get-funnel`, `create-funnel`, `update-funnel`, `delete-funnel`, `query-funnel` |
-| Issues | `list-issues`, `get-issue`, `resolve-issue`, `silence-issue`, `reopen-issue`, `claim-issue`, `merge-issues`, `list-issue-comments`, `add-issue-comment` |
+| Issues | `list-issues`, `get-issue`, `resolve-issue`, `silence-issue`, `snooze-issue`, `reopen-issue`, `claim-issue`, `merge-issues`, `list-issue-comments`, `add-issue-comment` |
 | Reviews | `list-reviews`, `get-review`, `respond-to-review`, `delete-review-response` (⚠️ destructive — removes the public reply on Apple's side) |
 | Ratings | `list-app-ratings`, `list-ratings-by-country`, `sync-app-ratings` |
 | Integrations | `list-providers`, `list-integrations`, `add-integration`, `update-integration`, `remove-integration`, `copy-integration`, `sync-integration` |
