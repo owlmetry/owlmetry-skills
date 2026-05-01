@@ -490,7 +490,8 @@ Owlmetry auto-captures Apple Search Ads attribution on `Owl.configure()` — no 
 On successful attribution the user picks up:
 - `attribution_source = "apple_search_ads"` (cross-network — future Meta/Google support writes `meta`/`google_ads` into the same key)
 - `asa_campaign_id`, `asa_ad_group_id`, `asa_keyword_id`, `asa_claim_type`, `asa_ad_id`, `asa_creative_set_id`
-- `likely_app_reviewer = "true"` when Apple returns its App Store review sandbox fixture (same numeric ID across campaign, ad group, and ad). The numeric IDs are still stored so the row is traceable — filter this flag out of acquisition dashboards so Apple's reviewer devices don't inflate paid-install counts.
+
+When Apple's AdServices API returns its deliberate non-production fixture (same numeric ID across campaign, ad group, and ad — structurally impossible from real Apple data), the user gets `attribution_source = "apple_test_install"` with **no** `asa_*` fields. This fires for **TestFlight builds, Xcode-deployed dev builds on real devices, and the iOS simulator** (Apple Forum #66161). Filter these out of acquisition dashboards alongside organic installs (`attribution_source IN ('none', 'apple_test_install')`), or treat them as a separate badge to spot a developer's own install showing up.
 
 An install Apple did not attribute gets `attribution_source = "none"` and nothing else.
 
@@ -526,7 +527,7 @@ Normal apps should not need to call this — the auto-capture on `configure()` c
 
 | `_outcome` | Level | Extra attributes | When |
 |---|---|---|---|
-| `success` | info | `_attribution_source` (`apple_search_ads` \| `none`) | Apple returned a decisive answer |
+| `success` | info | `_attribution_source` (`apple_search_ads` \| `none` \| `apple_test_install`) | Apple returned a decisive answer |
 | `pending` | info | `_attempt`, `_max_attempts` | Apple 404 — record not ready, will retry next launch |
 | `gave_up` | warn | `_attempts` | Hit the 5-pending cap; wrote `attribution_source = "none"` |
 | `token_fetch_failed` | warn | `_error` | `AAAttribution.attributionToken()` threw on-device |
