@@ -230,10 +230,19 @@ Owl.error("Keychain write failed", attributes: ["error": "\(error)"])
 
 All logging methods share the same signature:
 ```swift
-Owl.info(_ message: String, screenName: String? = nil, attributes: [String: String]? = nil, attachments: [OwlAttachment]? = nil)
+Owl.info(_ message: String, screenName: String? = nil, attributes: [String: String?] = [:], attachments: [OwlAttachment]? = nil)
 ```
 
 **`screenName` is optional.** Only pass it when the event originates from a specific screen in the UI (e.g., a button tap handler inside a view). **Do NOT pass `screenName`** when logging from utility functions, services, managers, network layers, background tasks, or anywhere that isn't directly tied to a visible screen. Passing a fabricated or guessed screen name is worse than omitting it — it pollutes screen-level analytics.
+
+**`attributes` accepts optional values.** A `String?` from your domain code can flow into the literal directly — `nil`-valued keys are silently dropped before the event ships, so you don't need to unwrap or build the dict conditionally:
+
+```swift
+let contractId: String? = session.draftId  // may be nil
+Owl.info("Draft created", attributes: ["context": "createDraft", "contractId": contractId])
+```
+
+The same applies to every method on `Owl` and `OwlOperation` that takes an `attributes:` parameter (`info`/`debug`/`warn`/`error`, `step`, `startOperation`, `recordMetric`, `complete`/`fail`/`cancel`).
 
 Source file, function, and line are auto-captured.
 
