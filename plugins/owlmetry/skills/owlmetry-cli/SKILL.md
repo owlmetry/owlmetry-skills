@@ -514,6 +514,8 @@ owlmetry ads sync --project-id <id> --format json
 - `ads sync` queues both `revenuecat_sync` and `apple_ads_sync` and returns their `job_run_id`s — monitor each with `owlmetry jobs view <runId>`. Admin role required (agent keys without admin get 403). `apple_ads_sync` refreshes both spend metrics and ID→name resolution. Use it when freshly-attributed users haven't shown up yet, or after the user runs an Apple Search Ads campaign update and wants spend + names refreshed without waiting for the next scheduled run (the daily 04:45 UTC cron now fans out `apple_ads_sync` across every project with an active integration).
 - A row's `name` will be null when the campaign/ad-group/keyword/ad ID is known but Apple Search Ads hasn't been synced yet — re-run `ads sync` (or wait for the next `apple_ads_sync` run) to backfill names.
 
+**Missing historical customers?** If a team just installed the SDK on an app where most paying customers already exist in RevenueCat, those users won't be in `app_users` yet — `revenuecat_sync` only refreshes rows the SDK (or RC webhooks) have already created. Run `owlmetry jobs trigger revenuecat_user_backfill --team-id <id> --project-id <id> --wait` to page every customer in the linked RC project and create/update `app_users` rows for each (sets subscriber state, lifetime USD revenue, ASA attribution properties; idempotent; anonymous RC IDs are skipped). After it finishes, re-run `ads sync` so attributed IDs resolve to names and the Advertising Insights page picks up the historical revenue.
+
 ## Background Jobs
 
 Background jobs are asynchronous server-side tasks with progress tracking and email notifications. Use them for long-running operations like syncing data from third-party services.
@@ -537,6 +539,8 @@ owlmetry jobs trigger revenuecat_sync --team-id <id> --project-id <id> --format 
 ```
 
 Add `--wait` to poll until complete with a live progress bar. Add `--notify` to receive an email when the job finishes. Add `--param key=value` (repeatable) for job-specific parameters.
+
+Project-scoped job types triggerable via the CLI: `revenuecat_sync` (refresh existing `app_users` rows from RC), `revenuecat_user_backfill` (page every customer in the linked RC project and create/update `app_users` rows — use after a fresh SDK install when paying customers pre-date the integration), `apple_ads_sync` (refresh ASA spend + ID→name resolution).
 
 ### Cancel
 
