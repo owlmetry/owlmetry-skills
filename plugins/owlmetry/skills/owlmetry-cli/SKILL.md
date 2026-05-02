@@ -225,6 +225,13 @@ owlmetry ratings list <appId> --project-id <id> [--store app_store|play_store] -
 owlmetry ratings by-country --project-id <id> [--app-id <id>] [--store app_store|play_store] --format json   # Aggregate per-country across every app in a project
 owlmetry ratings sync --project-id <id> --format json   # Manual sync (admin-only); auto-syncs daily 04:30 UTC
 
+# Advertising insights (campaigns/ad-groups/keywords+ads ranked by lifetime USD revenue)
+# Default --source is apple_search_ads (the only network shipped today; namespace reserves meta/google-ads/tiktok).
+owlmetry ads campaigns --project-id <id> [--app-id <id>] [--source apple_search_ads] [--limit <n>] --format json
+owlmetry ads ad-groups <campaignId> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json
+owlmetry ads leaves <adGroupId> --campaign-id <id> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json   # keywords + ads side-by-side
+owlmetry ads sync --project-id <id> --format json   # admin-only; fires revenuecat_sync + apple_ads_sync, returns both job_run_ids
+
 # Events
 owlmetry events [--project-id <id>] [--app-id <id>] [--level <level>] [--user-id <id>] [--session-id <id>] [--since <time>] [--limit <n>] [--order asc|desc] --format json
 owlmetry events view <id> --format json
@@ -483,6 +490,26 @@ Audit logs record who performed what action on which resource — creating an ap
 ```bash
 owlmetry audit-log list --team-id <id> [--resource-type <type>] [--resource-id <id>] [--actor-id <id>] [--action create|update|delete] [--since <time>] [--until <time>] [--limit <n>] --format json
 ```
+
+### Advertising Insights
+
+Rank attributed users by lifetime USD revenue, broken down by campaign → ad group → keyword | ad. The hierarchy is generic over `attribution_source` — today only `apple_search_ads` is shipped (the namespace reserves `meta`/`google-ads`/`tiktok` for later). The data combines two backfills: ASA campaign/ad-group/keyword/ad **names** come from the Apple Search Ads integration's `apple_ads_sync` job; lifetime **revenue** comes from RevenueCat (`total_revenue_usd_cents` on `app_users`, refreshed by the `revenuecat_sync` job). A user only contributes revenue once their RC subscriber data has been synced and their attribution IDs have been resolved to names.
+
+Each row carries `user_count`, `paying_user_count`, `total_revenue_usd`, and `arpu`. The `campaigns` response also returns project-wide `total_*` rollups and a `revenue_synced_at` timestamp (latest `revenue_synced_at` across the project's RC-synced users — null when never synced) so you can tell how stale the numbers are.
+
+```bash
+owlmetry ads campaigns --project-id <id> [--app-id <id>] [--source apple_search_ads] [--limit <n>] --format json
+owlmetry ads ad-groups <campaignId> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json
+owlmetry ads leaves <adGroupId> --campaign-id <id> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json
+owlmetry ads sync --project-id <id> --format json
+```
+
+- `--source` defaults to `apple_search_ads`. Pass another network only if it's been added — invalid values are rejected by Commander before the call.
+- `--app-id` scopes every query to a single app within the project; omit it for project-wide rollups.
+- `--limit` caps rows (server clamps 1–500, default 100). Rows are ordered by `total_revenue_usd DESC, user_count DESC, id ASC`.
+- `ads leaves` returns both keyword and ad rankings side-by-side because Apple attributes each install to one or the other depending on whether it came from a search keyword or an auto-driven ad placement. **`--campaign-id` is required** in addition to `--project-id` so the route can resolve the parent context.
+- `ads sync` queues both `revenuecat_sync` and `apple_ads_sync` and returns their `job_run_id`s — monitor each with `owlmetry jobs view <runId>`. Admin role required (agent keys without admin get 403). Use it when freshly-attributed users haven't shown up yet, or after the user runs an Apple Search Ads campaign update and wants names refreshed without waiting for the next scheduled run.
+- A row's `name` will be null when the campaign/ad-group/keyword/ad ID is known but Apple Search Ads hasn't been synced yet — re-run `ads sync` (or wait for the next `apple_ads_sync` run) to backfill names.
 
 ## Background Jobs
 
