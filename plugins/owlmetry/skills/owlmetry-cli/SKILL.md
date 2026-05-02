@@ -227,7 +227,9 @@ owlmetry ratings sync --project-id <id> --format json   # Manual sync (admin-onl
 
 # Advertising insights (campaigns/ad-groups/keywords+ads ranked by lifetime USD revenue)
 # Default --source is apple_search_ads (the only network shipped today; namespace reserves meta/google-ads/tiktok).
-owlmetry ads campaigns --project-id <id> [--app-id <id>] [--source apple_search_ads] [--limit <n>] --format json
+# `ads campaigns` accepts --project-id OR --team-id (mutually exclusive). With --team-id it aggregates
+# campaigns across every project in the team and each row carries the owning project so you can drill in.
+owlmetry ads campaigns (--project-id <id> | --team-id <id>) [--app-id <id>] [--source apple_search_ads] [--limit <n>] --format json
 owlmetry ads ad-groups <campaignId> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json
 owlmetry ads leaves <adGroupId> --campaign-id <id> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json   # keywords + ads side-by-side
 owlmetry ads sync --project-id <id> --format json   # admin-only; fires revenuecat_sync + apple_ads_sync, returns both job_run_ids
@@ -498,12 +500,13 @@ Rank attributed users by lifetime USD revenue, broken down by campaign → ad gr
 Each row carries `user_count`, `paying_user_count`, `total_revenue_usd`, and `arpu`. The `campaigns` response also returns project-wide `total_*` rollups and a `revenue_synced_at` timestamp (latest `revenue_synced_at` across the project's RC-synced users — null when never synced) so you can tell how stale the numbers are.
 
 ```bash
-owlmetry ads campaigns --project-id <id> [--app-id <id>] [--source apple_search_ads] [--limit <n>] --format json
+owlmetry ads campaigns (--project-id <id> | --team-id <id>) [--app-id <id>] [--source apple_search_ads] [--limit <n>] --format json
 owlmetry ads ad-groups <campaignId> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json
 owlmetry ads leaves <adGroupId> --campaign-id <id> --project-id <id> [--app-id <id>] [--source <source>] [--limit <n>] --format json
 owlmetry ads sync --project-id <id> --format json
 ```
 
+- `ads campaigns` accepts either `--project-id` (single-project view) or `--team-id` (mutually exclusive — aggregates campaigns across every project in the team, mirroring the dashboard's "All projects" view). The team-scoped response gains a leading **Project** column on each row so you can drill back down with `ads campaigns --project-id <owning_project>` (or `ads ad-groups`/`ads leaves`, which remain project-scoped). `--app-id` only applies in single-project mode.
 - `--source` defaults to `apple_search_ads`. Pass another network only if it's been added — invalid values are rejected by Commander before the call.
 - `--app-id` scopes every query to a single app within the project; omit it for project-wide rollups.
 - `--limit` caps rows (server clamps 1–500, default 100). Rows are ordered by `total_revenue_usd DESC, user_count DESC, id ASC`.
