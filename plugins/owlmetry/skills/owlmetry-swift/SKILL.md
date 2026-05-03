@@ -211,6 +211,8 @@ Events are the core unit of data in Owlmetry. Use the four log levels to capture
 
 Choose **message strings** that are specific and searchable. Prefer `"Failed to load profile image"` over `"error"`. Use `screenName` to tie events to where they happened in the UI. Use `attributes` for structured data you'll want to filter or search on later.
 
+`message` is silently truncated to 2000 characters; attribute values are silently truncated to 200 characters. Put long content in `attributes`, not in `message`.
+
 ```swift
 // In a screen context — pass screenName to tie the event to the screen
 Owl.info("User opened settings", screenName: "SettingsView")
