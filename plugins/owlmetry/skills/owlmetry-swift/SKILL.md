@@ -167,8 +167,10 @@ struct SettingsView: View {
 ```
 
 **What it does automatically:**
-- On appear: emits `sdk:screen_appeared` (info level) with `screenName` set — included in production data
-- On disappear: emits `sdk:screen_disappeared` (debug level) with `screenName` set and `_duration_ms` attribute — only visible in dev data mode
+- On appear: emits `sdk:screen_appeared` (debug level) with `screenName` set
+- On disappear: emits `sdk:screen_disappeared` (debug level) with `screenName` set and `_duration_ms` attribute
+
+Both events are debug-level and filtered out of the default production view — switch to dev data mode (or filter by level) to see screen flow. The disappear event with `_duration_ms` is the more useful signal; appear is retained so you can detect screens opened but never closed (e.g. a crash mid-screen).
 
 **Where to place it:** Attach `.owlScreen("ScreenName")` to the outermost view of each screen — typically on the `NavigationStack`, `Form`, `ScrollView`, or root `VStack`. Use it on every distinct screen in the app. Choose names that are short, readable, and consistent (e.g., `"Home"`, `"Settings"`, `"Profile"`, `"Checkout"`).
 
@@ -692,5 +694,5 @@ Every event automatically includes:
 - `sdk:session_started` — on `configure()`, includes `_launch_ms` (time from process start to configure)
 - `sdk:app_foregrounded` — when app enters foreground
 - `sdk:app_backgrounded` — when app enters background
-- `sdk:screen_appeared` (info) / `sdk:screen_disappeared` (debug) — when using `.owlScreen()` modifier (disappear includes `_duration_ms`)
+- `sdk:screen_appeared` (debug) / `sdk:screen_disappeared` (debug) — when using `.owlScreen()` modifier (disappear includes `_duration_ms`)
 - `sdk:network_request` (info/warn/error) — URLSession HTTP requests with method, URL, status, duration (enabled by default, disable with `networkTrackingEnabled: false`)
