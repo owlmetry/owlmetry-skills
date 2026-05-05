@@ -403,7 +403,7 @@ owlmetry jobs trigger revenuecat_sync --team-id <id> --project-id <id> --wait
 
 ### Issues
 
-Issues are automatically created by an hourly background scan that detects error-level events, deduplicates them by fingerprint (normalized message + source module), and groups related occurrences. Each issue tracks affected sessions, unique users, and app versions.
+Issues are automatically created by an hourly background scan that detects error-level events, deduplicates them by fingerprint (normalized message + source module), and groups related occurrences. Each issue tracks affected sessions, unique users, and app versions. **Network errors** (`sdk:network_request`) additionally discriminate on `${method} ${host}${templated_path}` so a failure to `api.revenuecat.com` doesn't collapse onto the same issue as a failure to your own backend; their titles are `Network error: METHOD host/path` and per-user IDs in the path (UUIDs, numbers, Firebase/Stripe/Mongo/Cuid/Nanoid/ULID/Auth0/DID-style opaque IDs) are templated to placeholders so the issue groups by endpoint shape, not by user.
 
 **Status lifecycle:** `new` → `in_progress` (claimed by agent/user) → `resolved` (optionally with version) → may `regress` if the error reappears in a newer app version. Two off-ramps stop notifications without claiming a fix: `silenced` (terminal — stays silent even if the error keeps happening; use for transient infra blips you've decided to live with) and `snoozed` (auto-reverts to `new` and re-fires the `issue.new` push on the very next occurrence; use when you suspect a one-off and only want to be alerted if the assumption turns out wrong).
 
