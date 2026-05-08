@@ -224,18 +224,28 @@ Owl.warn("Invalid email format", screenName: "SignUpView", attributes: ["input":
 do {
     let profile = try await api.loadProfile(id: userId)
 } catch {
-    Owl.error("Failed to load profile", screenName: "ProfileView", attributes: ["error": "\(error)"])
+    // Pass the Error directly — the SDK extracts the runtime type, NSError
+    // domain/code, the underlying-error chain, and the call stack. The
+    // server's issue tracker uses the type as a fingerprint discriminator,
+    // so a URLError and a DecodingError with the same wording stay on
+    // separate issues.
+    Owl.error(error, "while loading profile", screenName: "ProfileView")
 }
 
 // Outside a screen context — omit screenName entirely
 Owl.info("Background sync completed", attributes: ["items": "\(count)"])
-Owl.error("Keychain write failed", attributes: ["error": "\(error)"])
+
+// String-only Owl.error still works for cases where you don't have an
+// Error value (precondition failures, manual checks, etc).
+Owl.error("Keychain returned no payload for current session")
 ```
 
 All logging methods share the same signature:
 ```swift
 Owl.info(_ message: String, screenName: String? = nil, attributes: [String: String?] = [:], attachments: [OwlAttachment]? = nil)
 ```
+
+`Owl.error` is overloaded — the first argument may be a `String` (logger-style) or an `Error` (exception-style; the SDK extracts type/stack/domain/code/cause-chain into reserved `_error_*` attributes). When you have an Error value from `do/catch`, prefer the Error form — you get a richer, queryable issue and per-type fingerprinting.
 
 **`screenName` is optional.** Only pass it when the event originates from a specific screen in the UI (e.g., a button tap handler inside a view). **Do NOT pass `screenName`** when logging from utility functions, services, managers, network layers, background tasks, or anywhere that isn't directly tied to a visible screen. Passing a fabricated or guessed screen name is worse than omitting it — it pollutes screen-level analytics.
 

@@ -124,11 +124,18 @@ Owl.warn('Invalid request payload', { field: 'email', reason: 'missing' });
 try {
   await db.connect();
 } catch (err) {
-  Owl.error('Database connection failed', { host: 'db.example.com', error: String(err) });
+  // Pass the Error directly — the SDK extracts type, full stack, Error.cause
+  // chains, AggregateError children, and Node ErrnoException fields
+  // (code/syscall/path) into reserved `_error_*` attributes. The server
+  // uses _error_type as a fingerprint discriminator so different error
+  // classes with the same message stay on separate issues.
+  Owl.error(err, 'while connecting to database', { host: 'db.example.com' });
 }
 ```
 
-All methods: `Owl.info/debug/warn/error(message, attrs?, options?)`. The third `options` argument supports `{ attachments }` for uploading files alongside the event — see *File Attachments* below.
+All info/debug/warn methods: `Owl.info/debug/warn(message, attrs?, options?)`. `Owl.error` is overloaded — first argument may be a `string` (logger-style) or any value (`Error`, `unknown`, etc — exception-style; the SDK extracts structured fields from Error instances). The third `options` argument supports `{ attachments }` for uploading files alongside the event — see *File Attachments* below.
+
+**Auto-capture of unhandled errors is on by default.** The SDK installs `process.on('uncaughtException')` and `process.on('unhandledRejection')` listeners that capture and forward as `Owl.error` events tagged with `_unhandled`. Crash semantics are preserved — your app keeps crashing on uncaught errors exactly like it would without the SDK, and any pre-existing handlers you've registered still run. Opt out via `Owl.configure({ ..., captureUnhandled: false })`.
 
 `message` is silently truncated to 2000 characters; attribute values are silently truncated to 200 characters. Put long content in attributes, not in `message`.
 
@@ -145,7 +152,7 @@ Owl.warn('Rate limit approaching', { current: 95, limit: 100, client_id: 'abc' }
 try {
   await stripe.charges.create(params);
 } catch (err) {
-  Owl.error('Stripe charge failed', { endpoint: '/charges', error: String(err) });
+  Owl.error(err, 'Stripe charge failed', { endpoint: '/charges' });
 }
 ```
 
@@ -157,7 +164,7 @@ When an error's root cause is bound up in a file the server received — a PDF t
 try {
   await PdfParser.parse(inputPath);
 } catch (err) {
-  Owl.error('pdf parse failed', { error: String(err) }, {
+  Owl.error(err, 'pdf parse failed', undefined, {
     attachments: [
       { path: inputPath, name: 'input.pdf' },                               // from disk
       { buffer: diagnosticsJson, name: 'debug.json', contentType: 'application/json' }, // in memory
