@@ -235,7 +235,7 @@ owlmetry ads leaves <adGroupId> --campaign-id <id> --project-id <id> [--app-id <
 owlmetry ads sync --project-id <id> --format json   # admin-only; fires revenuecat_sync + apple_ads_sync (the latter refreshes both spend metrics and IDs→names), returns both job_run_ids
 
 # Events
-owlmetry events [--project-id <id>] [--app-id <id>] [--level <level>] [--user-id <id>] [--session-id <id>] [--since <time>] [--limit <n>] [--order asc|desc] --format json
+owlmetry events [--project-id <id>] [--app-id <id>] [--level <levels>] [--user-id <id>] [--session-id <id>] [--since <time>] [--limit <n>] [--order asc|desc] --format json
 owlmetry events view <id> --format json
 owlmetry investigate <eventId> [--window <minutes>] --format json
 
@@ -439,11 +439,13 @@ owlmetry issues comments <issueId> --project-id <id> --format json           # L
 Events are the raw log records emitted by SDKs — every `Owl.info()`, `Owl.error()`, `Owl.step()`, etc. Query events when debugging specific issues, investigating user behavior, or reviewing what happened in a time window. Each event also carries a `country_code` (ISO-3166 alpha-2, stamped server-side from the ingest request, not sent by SDKs) and the `events`/`events view` output includes a Country column/field. Events and feedback also carry `sdk_name` (e.g. `owlmetry-swift`, `owlmetry-node`) + `sdk_version` (auto-stamped by the official SDKs); `events view` shows an SDK row, and `app_users` denormalises `last_sdk_name`/`last_sdk_version` so you can spot users still on a stale SDK. Issues denormalise `first_seen_sdk_version`/`last_seen_sdk_version` for the same reason — useful for answering "is this issue specific to SDK 0.1.x?".
 
 ```bash
-owlmetry events [--project-id <id>] [--app-id <id>] [--since <time>] [--until <time>] [--level info|debug|warn|error] [--user-id <id>] [--session-id <id>] [--screen-name <name>] [--limit <n>] [--cursor <cursor>] [--data-mode production|development|all] [--order asc|desc] --format json
+owlmetry events [--project-id <id>] [--app-id <id>] [--since <time>] [--until <time>] [--level <levels>] [--user-id <id>] [--session-id <id>] [--screen-name <name>] [--limit <n>] [--cursor <cursor>] [--data-mode production|development|all] [--order asc|desc] --format json
 owlmetry events view <id> --format json
 ```
 
 Defaults to last 24 hours if no `--since`/`--until` specified. Default sort is `--order desc` (newest first). Pass `--order asc` to walk events chronologically — preferred when reconstructing a session or reading a breadcrumb timeline. The pagination cursor is tied to the current order, so keep `--order` consistent across pages.
+
+`--level` accepts a single level (`--level error`) or a comma-separated list (`--level warn,error`). Allowed values: `info`, `debug`, `warn`, `error`.
 
 ### Investigate (breadcrumb timeline)
 
