@@ -2,7 +2,7 @@
 name: owlmetry-node
 description: >-
   Integrate the Owlmetry Node.js SDK into a backend service for server-side
-  analytics, event tracking, metrics, funnels, and A/B experiments. Use when
+  analytics, event tracking, metrics, and funnels. Use when
   instrumenting a Node.js, Express, Fastify, or serverless project with Owlmetry.
 allowed-tools: Read, Bash, Grep, Glob
 ---
@@ -302,31 +302,6 @@ Owl.recordMetric('cache-hit-rate', { rate: '0.95', cache: 'redis' });
 Works with scoped instances too: `owl.startOperation(...)`, `owl.recordMetric(...)`.
 
 **Slug rules:** lowercase letters, numbers, hyphens only. Invalid slugs are auto-corrected with a warning.
-
-## A/B Experiments
-
-Backend experiments let you vary server-side behavior (algorithm versions, feature flags, response formats) and measure the impact through metrics and funnels.
-
-How it works end-to-end:
-1. **Assign a variant**: `getVariant("pricing-algo", ["control", "v2"])` randomly picks on first call.
-2. **Branch your logic**: use the returned variant string to execute different code paths.
-3. **Events are auto-tagged**: all subsequent events include the experiment assignment.
-4. **Analyse**: query metrics or funnels segmented by variant to compare outcomes.
-
-Assignments persist to `~/.owlmetry/experiments.json` on disk, so they survive restarts. **Serverless caveat**: in serverless environments (Lambda, Cloud Functions), each cold start reads from the file — but if the filesystem is ephemeral, assignments won't persist across invocations. Use `setExperiment()` with a server-side assignment for stable bucketing in serverless.
-
-```typescript
-// Random assignment on first call, persisted to ~/.owlmetry/experiments.json
-const variant = Owl.getVariant('checkout-redesign', ['control', 'variant-a', 'variant-b']);
-
-// Force-set (e.g., from server config)
-Owl.setExperiment('checkout-redesign', 'variant-a');
-
-// Clear all
-Owl.clearExperiments();
-```
-
-All events automatically include an `experiments` field with current assignments.
 
 ## User Properties
 

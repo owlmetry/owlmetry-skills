@@ -2,7 +2,7 @@
 name: owlmetry-swift
 description: >-
   Integrate the Owlmetry Swift SDK into an iOS, iPadOS, macOS, or watchOS
-  app for analytics, event tracking, metrics, funnels, and A/B experiments.
+  app for analytics, event tracking, metrics, and funnels.
   Use when instrumenting a Swift or SwiftUI project with Owlmetry.
 allowed-tools: Read, Bash, Grep, Glob
 ---
@@ -486,32 +486,6 @@ Owl.recordMetric("app-cold-start", attributes: ["screen": "home"])
 
 **Slug rules:** lowercase letters, numbers, hyphens only. Invalid slugs are auto-corrected with a console warning.
 
-## A/B Experiments
-
-Owlmetry provides lightweight client-side A/B testing. The flow is:
-
-1. **Assign a variant**: `getVariant("experiment-name", options: ["control", "variant-a"])` randomly picks a variant on first call.
-2. **Render conditionally**: use the returned variant string to show different UI.
-3. **Events are auto-tagged**: all subsequent events include the experiment assignment in their `experiments` field.
-4. **Analyse**: query funnel or metric data segmented by variant to compare performance.
-
-`getVariant()` persists the assignment in Keychain, so the same user always sees the same variant across launches. Use `setExperiment()` to force a specific variant (e.g., from a server-side feature flag system). Use `clearExperiments()` to reset all assignments (e.g., for testing).
-
-```swift
-// Random assignment on first call, persisted to Keychain thereafter
-let variant = Owl.getVariant("checkout-redesign", options: ["control", "variant-a", "variant-b"])
-
-// Force-set a variant (e.g., from server config)
-Owl.setExperiment("checkout-redesign", variant: "variant-a")
-
-// Clear all assignments
-Owl.clearExperiments()
-```
-
-- Assignments persist in Keychain (`com.owlmetry.experiments`).
-- All events automatically include an `experiments` field with current assignments.
-- Query funnel analytics segmented by variant via CLI: `owlmetry funnels query <slug> --project <id> --group-by experiment:checkout-redesign`
-
 ## User Properties
 
 Attach custom key-value metadata to the current user. Properties are merged server-side — existing keys not in your call are preserved.
@@ -709,7 +683,6 @@ When instrumenting a new app, follow this priority:
 
 **Instrument when relevant (funnels — requires CLI `owlmetry funnels create` first):**
 - Multi-step flows you want to measure conversion on: onboarding, checkout, activation
-- A/B experiments when testing alternative UI or flows
 
 **Where to place calls:**
 - Screen views: `.owlScreen("Name")` on the outermost view of each screen (SwiftUI), `viewDidAppear` in UIKit
@@ -741,7 +714,6 @@ Every event automatically includes:
 - `app_version`, `build_number` (from bundle)
 - `is_dev` — `true` in DEBUG builds
 - `_connection` — network type (wifi, cellular, ethernet, offline) via `NWPathMonitor`
-- `experiments` — current A/B experiment assignments
 - `environment` — specific runtime (ios, ipados, macos, watchos)
 - `country_code` — ISO-3166 alpha-2 country, stamped server-side from the ingest request (SDK does not send this)
 - `sdk_name` (`"owlmetry-swift"`) and `sdk_version` (the resolved SPM tag) — auto-stamped on every event and feedback submission. **Do not set these manually** — they're managed by the SDK so the server can tell which SDK and version produced each event.

@@ -479,10 +479,10 @@ owlmetry metrics query <slug> --project-id <id> [--since <time>] [--until <time>
 
 ### Funnel Analytics
 
-Funnel queries return conversion rates and drop-off between steps. The output shows how many users entered each step and what percentage continued to the next. Use `--group-by` to segment results and compare conversion across environments, app versions, or A/B experiment variants.
+Funnel queries return conversion rates and drop-off between steps. The output shows how many users entered each step and what percentage continued to the next. Use `--group-by` to segment results and compare conversion across environments or app versions.
 
 ```bash
-owlmetry funnels query <slug> --project-id <id> [--since <time>] [--until <time>] [--closed] [--app-version <v>] [--environment <env>] [--experiment <name:variant>] [--group-by environment|app_version|experiment:<name>] [--data-mode <mode>] --format json
+owlmetry funnels query <slug> --project-id <id> [--since <time>] [--until <time>] [--closed] [--app-version <v>] [--environment <env>] [--group-by environment|app_version] [--data-mode <mode>] --format json
 ```
 
 `--closed` = closed (sequential) funnel mode. Without this flag, open mode is used (steps evaluated independently).
