@@ -1,15 +1,15 @@
 ---
 name: owlmetry-swift
 description: >-
-  Integrate the Owlmetry Swift SDK into an iOS or macOS app for analytics,
-  event tracking, metrics, funnels, and A/B experiments. Use when
-  instrumenting a Swift or SwiftUI project with Owlmetry.
+  Integrate the Owlmetry Swift SDK into an iOS, iPadOS, macOS, or watchOS
+  app for analytics, event tracking, metrics, funnels, and A/B experiments.
+  Use when instrumenting a Swift or SwiftUI project with Owlmetry.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 
 ## What is Owlmetry?
 
-Owlmetry is a self-hosted analytics platform. The Swift SDK captures events from iOS, iPadOS, and macOS apps and delivers them to the Owlmetry server. It handles buffering, gzip compression, offline queuing, session management, and network monitoring automatically — you just call logging methods and the SDK takes care of delivery.
+Owlmetry is a self-hosted analytics platform. The Swift SDK captures events from iOS, iPadOS, macOS, and watchOS apps and delivers them to the Owlmetry server. It handles buffering, gzip compression, offline queuing, session management, and network monitoring automatically — you just call logging methods and the SDK takes care of delivery. On watchOS the SDK also auto-relays through the paired iPhone when direct HTTP isn't available — see the "watchOS Companion Apps" section below.
 
 The SDK is a static `Owl` enum with no external dependencies. All calls are non-blocking (events are buffered and flushed in batches). A single `configure()` call initialises everything.
 
@@ -31,7 +31,7 @@ If the user doesn't have these yet, follow the `/owlmetry-cli` skill first — i
 
 ## Add Swift Package
 
-**Minimum platforms:** iOS 16.0, macOS 13.0. Zero external dependencies.
+**Minimum platforms:** iOS 16.0, macOS 13.0, watchOS 10.0. Zero external dependencies.
 
 **First, fetch the latest SDK release tag** — pin to a version so builds are reproducible:
 
@@ -116,6 +116,52 @@ struct MyApp: App {
 - `consoleLogging: Bool` — print events to console/Xcode output (default: `true`)
 
 Auto-detects: bundle ID, debug mode (`#if DEBUG`). Auto-generates: session ID (fresh each launch).
+
+## watchOS Companion Apps
+
+Only relevant if the project ships a watchOS app target (typically alongside an iOS counterpart). Skip this section entirely for iOS-only / macOS-only projects.
+
+The SDK ships native watchOS 10+ support: `Owl.configure(...)`, `Owl.track(...)`, `Owl.error(...)`, attachments, attribution, everything works identically on the watch. Delivery uses a tiered pipeline (direct HTTP → WatchConnectivity → on-disk queue) so events survive the watch being suspended, out of cellular range, or far from its iPhone. Full background: https://owlmetry.com/docs/sdks/swift/watchos.
+
+**Watch-side**: nothing special — call `Owl.configure(...)` in `@main App.init()`. The SDK auto-activates `WCSession.default` on the watch.
+
+**iPhone-side counterpart (REQUIRED)**: the iPhone app must forward inbound WatchConnectivity payloads into the Owlmetry pipeline. The SDK never claims `WCSession.default.delegate` on iPhone — the host app owns it. Add **one line** to the existing `WCSessionDelegate.session(_:didReceiveUserInfo:)`:
+
+```swift
+import WatchConnectivity
+import Owlmetry
+
+final class PhoneSessionDelegate: NSObject, WCSessionDelegate {
+    func session(
+        _ session: WCSession,
+        didReceiveUserInfo userInfo: [String: Any]
+    ) {
+        if Owl.handleWatchUserInfo(userInfo) { return }
+        // ... existing handling for non-Owlmetry payloads
+    }
+
+    func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {}
+    func sessionDidBecomeInactive(_ session: WCSession) {}
+    func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
+}
+```
+
+If the iPhone app doesn't use WatchConnectivity for anything else, wire the minimal delegate above in `application(_:didFinishLaunchingWithOptions:)`:
+
+```swift
+private let sessionDelegate = PhoneSessionDelegate()
+// in didFinishLaunching:
+if WCSession.isSupported() {
+    WCSession.default.delegate = sessionDelegate
+    WCSession.default.activate()
+}
+```
+
+**Without the one-line forward, watch events that arrive via the WC fallback never reach the server.** Direct HTTP from the watch still works (when cellular is available), but events emitted while the watch is offline and waiting to relay through the phone are silently dropped on receive.
+
+`Owl.handleWatchUserInfo(_:)` is safe to call before `Owl.configure(...)` — pre-configure events are buffered internally and drained once configure completes. iOS may cold-launch the host app to deliver a watch payload, racing your app's configure call.
+
+Watch events arrive on the server with `environment: "watchos"` (distinct from `ios`/`ipados`/`macos`). The app's broad `platform` stays `apple` — no separate app needed.
 
 ## User Identity (set up during initial configuration)
 
@@ -696,7 +742,7 @@ Every event automatically includes:
 - `is_dev` — `true` in DEBUG builds
 - `_connection` — network type (wifi, cellular, ethernet, offline) via `NWPathMonitor`
 - `experiments` — current A/B experiment assignments
-- `environment` — specific runtime (ios, ipados, macos)
+- `environment` — specific runtime (ios, ipados, macos, watchos)
 - `country_code` — ISO-3166 alpha-2 country, stamped server-side from the ingest request (SDK does not send this)
 - `sdk_name` (`"owlmetry-swift"`) and `sdk_version` (the resolved SPM tag) — auto-stamped on every event and feedback submission. **Do not set these manually** — they're managed by the SDK so the server can tell which SDK and version produced each event.
 
