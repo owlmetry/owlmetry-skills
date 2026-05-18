@@ -683,7 +683,13 @@ struct RootView: View {
 }
 ```
 
-When the trigger fires AND the user is server-side eligible (not already responded, not globally dismissed), the SDK fetches the latest schema and presents `OwlQuestionnaireView` in a sheet automatically.
+When the trigger fires AND the user is server-side eligible (not already responded, not globally dismissed), the SDK opens a **non-swipe-dismissible** sheet at a small "Quick favor?" consent detent with three buttons: **Sure, happy to help** (expands to the full step flow), **Maybe later** (closes; re-evaluates next foreground), and **Don't ask again** (writes the global dismiss flag after a confirmation). Once accepted, questions render one-per-page with a top progress bar and Back / Next / Submit; on submit, an in-sheet success page (✓ + Thanks + Done) replaces the questions.
+
+Pass `showsConsent: false` to skip the consent prompt and go straight to the step flow:
+
+```swift
+.owlQuestionnaire(slug: "...", trigger: .afterLaunch, showsConsent: false)
+```
 
 ### Composable triggers (ANDed conditions)
 
@@ -715,10 +721,27 @@ OR-logic isn't built in. Use `isEligible: { ... }` for custom gating, or attach 
 
 ### Tint
 
-`tint: Color?` is propagated through the sheet's environment to the Submit button, rating stars, single-choice checkmarks, and multi-choice toggles. Omit it to inherit your app's accent color.
+`tint: Color?` is propagated through the sheet's environment to the consent accept button, progress bar, rating stars, NPS chips, single/multi choice selected state, and the bottom Submit / Next / Done buttons. Omit it to inherit your app's accent color.
 
 ```swift
 .owlQuestionnaire(slug: "...", trigger: .afterLaunch, tint: .orange)
+```
+
+### Custom consent copy
+
+The consent prompt's title, body, and three button labels are all overridable via `OwlQuestionnaireStrings`. The questionnaire's server-side `description` overrides `consentBody` automatically when non-empty, so different surveys can carry their own pitch without per-call overrides.
+
+```swift
+.owlQuestionnaire(
+    slug: "...",
+    trigger: .afterLaunch,
+    strings: .default.with(
+        consentTitle: "Got a minute?",
+        consentAccept: "I'm in",
+        consentLater: "Not right now",
+        consentNever: "Stop asking me"
+    )
+)
 ```
 
 ### Manual presentation
