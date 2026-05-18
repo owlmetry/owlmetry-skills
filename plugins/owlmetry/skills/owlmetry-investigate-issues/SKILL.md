@@ -7,7 +7,7 @@ description: >-
   timeline, posts findings back as comments, then walks the user through
   claim → fix → resolve-with-version. Use when you want to know what's
   broken in production and decide what to fix first.
-allowed-tools: Bash, Read, Grep, Glob, Task
+allowed-tools: Bash, Read, Grep, Glob, Task, AskUserQuestion
 ---
 
 ## What this skill does
@@ -30,6 +30,20 @@ You need **either** the `owlmetry` MCP server connected (preferred — every too
 > **Prefer MCP tools when available.** CLI fallback is provided for every step in the table at the bottom of this file. Do not mix unless you have to — pick one transport per run.
 
 This skill is **read-mostly**: the only writes it ever performs are `add-issue-comment` (during investigation, always), `claim-issue` / `resolve-issue` / `silence-issue` / `snooze-issue` / `merge-issues` (during action, only after user confirmation).
+
+## How to prompt the user
+
+**Every decision point in this skill MUST use the `AskUserQuestion` tool.** Do not ask free-text yes/no questions in chat — they are easy to misread and slow to answer. `AskUserQuestion` gives the user a structured menu of 2–4 options plus an automatic "Other" for free-form answers.
+
+Conventions:
+
+- **Header**: ≤12 chars, e.g. `"Project"`, `"Claim?"`, `"Version"`, `"How to fix"`, `"First issue"`.
+- **Recommended option first**, with `(Recommended)` appended to its label. The recommendation is the agent's best read of the data — the user can still pick another option or "Other".
+- **2–4 options** per question; the tool refuses outside that range. If the natural option set is larger (e.g. 7 projects to choose from), pre-list them all in chat first, then ask `AskUserQuestion` with the top 3 most-likely picks — the user falls through to "Other" for any other choice and types the slug.
+- **Mutually exclusive options** unless `multiSelect: true` is genuinely needed (e.g. picking which channels to enable). Most prompts in this skill are single-select.
+- **Use `preview`** (single-select only) when showing a diff or table would help the user compare — e.g. proposed version bump diff, candidate merge pair summary.
+
+Each step below names the prompt header + the exact option labels to use. Do not improvise.
 
 ## Step 1 — Determine the project
 
@@ -65,18 +79,21 @@ If `mcp__owlmetry__list-projects` returns exactly one project for the user's tea
 
 **e. Otherwise — ask:**
 
-List projects and prompt the user to pick:
+If there are 2–4 projects, ask directly via `AskUserQuestion` (header `"Project"`), one option per project labeled `<Name> (<slug>)`.
+
+If there are 5+, list them all in chat first:
 
 ```
-Found 4 Owlmetry projects on your team:
+Found 7 Owlmetry projects on your team:
   1. Lofi               (slug: lofi)
   2. Signature Creator  (slug: signature-creator)
   3. Demo Project       (slug: demo)
-  4. Owlmetry           (slug: owlmetry)
-Which project should I investigate?
+  ...
 ```
 
-Once a project is selected, also note whether to filter by a specific app (multi-app projects only). Default to "all apps" unless the codebase clearly points at one (e.g. detected bundle ID matches one app).
+…then `AskUserQuestion` with header `"Project"` and the top 3 most-likely picks (e.g. by recent activity, or alphabetical) as labeled options. Anything else falls through to "Other" — the user types the slug or number there.
+
+Once a project is selected, also note whether to filter by a specific app (multi-app projects only). For multi-app projects, ask via `AskUserQuestion` (header `"App filter"`, options: each app name + "All apps (Recommended)") unless the codebase clearly points at one (e.g. detected bundle ID matches one app), in which case just use that and tell the user.
 
 > **Always print the resolved project name + ID at the top of the run.** This is the user's one chance to spot a wrong-project misfire before any state changes.
 
@@ -169,7 +186,15 @@ Below the table, output a short prose recommendation block. Aim for 3–6 bullet
 - **Merge candidates**: any pair of issues where sub-agent reports identify the same root cause or overlapping `_error_stack` — offer `merge-issues`.
 - **Stale candidates**: issues tagged `resolve-current-version` — offer to resolve them all at the app's current `latest_app_version` in one batch. If they ever come back at the same error level, regression detection catches it.
 
-Then **stop and ask** which to tackle first. Phrase the prompt with the issue number from the table, e.g. "Pick a row (1–14), or type `batch-downgrade` / `batch-resolve-stale` / `merge X→Y`."
+Then **stop and ask** which to tackle first via `AskUserQuestion` (header `"First issue"`). Pick 3 of the most useful actions as options, in this order of preference:
+
+1. `Fix #<top-fix-now-row> — <short title> (Recommended)`
+2. `Batch downgrade <N> network issues` — only if ≥2 `downgrade-sdk-call` candidates exist.
+3. `Batch resolve <N> stale issues at v<latest>` — only if ≥2 `resolve-current-version` candidates exist.
+4. `Merge #X → #Y` — only if a clear duplicate pair was identified.
+5. `Stop for now`
+
+Cap at 4 option slots; if more than 4 actions are equally relevant, keep the top fix-now + the two largest batches + "Stop for now", and let the user fall through to "Other" to specify a row number explicitly.
 
 > **Do not auto-claim, do not auto-fix.** This is the human-in-the-loop checkpoint.
 
@@ -177,7 +202,10 @@ Then **stop and ask** which to tackle first. Phrase the prompt with the issue nu
 
 Once the user picks issue X:
 
-1. **Confirm claim**: ask "Claim issue X (sets status to `in_progress`)? This is visible to the team." On yes, call `mcp__owlmetry__claim-issue` with `project_id=<id>`, `issue_id=<X>`.
+1. **Confirm claim** via `AskUserQuestion` (header `"Claim?"`):
+   - `Claim and start (Recommended)` — calls `claim-issue`, sets status to `in_progress` (visible to the team).
+   - `Investigate without claiming` — read-only walkthrough; no state change.
+   - `Cancel` — back to the table.
 
 2. **Locate the call site**: re-read the sub-agent's report for the `_error_stack` and `_error_type` from the latest occurrence. Then grep the codebase:
    - For Swift: `grep -rnE '<class-or-message-substring>' --include='*.swift' .`
@@ -186,56 +214,51 @@ Once the user picks issue X:
 
 3. **Help the user write the fix.** Suggest the code change but **stop after editing** — do not assume tests pass. Let the user run their own verification.
 
-4. **Ask about version bump**: "What version will this fix ship in? I can bump now."
-   - For Swift apps, look at `Info.plist` `CFBundleShortVersionString` or `MARKETING_VERSION` in `.pbxproj` / `.xcconfig`.
-   - For Node packages, look at `package.json` `version`.
-   - Suggest the next semver (patch for bug fix; ask if minor/major).
-   - **Wait for explicit user OK before editing version files.** The user may want to batch this fix with other changes in the same release.
+4. **Ask about version bump** via `AskUserQuestion` (header `"Version"`):
+   - For Swift apps, read current version from `Info.plist` `CFBundleShortVersionString` or `MARKETING_VERSION` in `.pbxproj` / `.xcconfig`.
+   - For Node packages, read `package.json` `version`.
+   - Options:
+     - `Bump to <next-patch> (Recommended)` — e.g. `1.4.0 → 1.4.1` for a bug fix.
+     - `Bump to <next-minor>` — e.g. `1.4.0 → 1.5.0` if the fix ships alongside a new feature.
+     - `Don't bump now — I'll resolve once shipped` — keeps the issue claimed; ask again later.
+   - Use the `preview` field on the bump options to show the proposed file diff inline so the user can compare before committing.
+   - **Wait for explicit user OK before editing version files.**
 
-5. **Resolve with version**: once the user confirms the fix is committed (or is about to ship) at version `Y`, call `mcp__owlmetry__resolve-issue` with `project_id=<id>`, `issue_id=<X>`, `version=Y`. The `version` field is **mandatory** — Owlmetry returns 400 if missing. If the user can't commit to a version yet, suggest `snooze` or `silence` instead and skip the resolve.
+5. **Resolve with version** via `AskUserQuestion` (header `"Resolve?"`) once the user has chosen a target version `Y`:
+   - `Resolve at v<Y> (Recommended)` — calls `resolve-issue` with `version=Y`. Mandatory; Owlmetry returns 400 without it.
+   - `Snooze instead` — calls `snooze-issue` (auto-revives on next occurrence).
+   - `Silence instead` — calls `silence-issue` (terminal).
+   - `Cancel` — leave as `in_progress`.
 
 ## Step 7 — Downgrade flow
 
-For issues the sub-agent tagged `downgrade-sdk-call` (typically network errors where the SDK already retries and the UX handles failure gracefully), there are two real-world options. Explain both, let the user pick per issue:
+For issues the sub-agent tagged `downgrade-sdk-call` (typically network errors where the SDK already retries and the UX handles failure gracefully), ask via `AskUserQuestion` (header `"How to fix"`):
 
-**a. Silence in dashboard only** — stop alerts, keep recording occurrences:
+- `Downgrade SDK call + resolve (Recommended)` — find the `Owl.error(...)` call site (same grep approach as Step 6.2), change to `Owl.warn(...)` so future occurrences no longer cluster into issues, then `resolve-issue` with `version=<apps.latest_app_version>`. The regression detector keeps a safety net: if the same call site ever emits `error` again, a new issue is created.
+- `Silence in dashboard only` — `silence-issue` (terminal). Stops alerts but keeps recording occurrences for forensic data.
+- `Treat as a real bug — fix at error level` — fall through to the regular fix flow (Step 6) instead.
+- `Skip — leave open` — no change.
 
-```text
-mcp__owlmetry__silence-issue  project_id=<id>  issue_id=<X>
-```
-
-`silenced` is terminal — Owlmetry will not re-alert even if the error keeps happening. Use when you want forensic data without notification noise.
-
-**b. Downgrade the SDK call + resolve** — fix the noise at the source:
-
-1. Find the `Owl.error(...)` call site (same grep approach as Step 6.2).
-2. Change it to `Owl.warn(...)` so future occurrences no longer cluster into issues.
-3. Resolve the existing issue at the app's current `latest_app_version`:
-   ```text
-   mcp__owlmetry__resolve-issue  project_id=<id>  issue_id=<X>  version=<latest_app_version>
-   ```
-
-Option (b) is usually the right call for network errors with graceful UX, because the regression detector still catches the case where the same call site ever emits `error` again — you've reduced noise without dropping the safety net.
+Option (a) is usually right for network errors with graceful UX. Phrase the rationale in the agent's prose accompanying the prompt; let the user pick.
 
 ## Step 8 — Snooze flow (suspected one-offs)
 
-For issues where the sub-agent saw a single occurrence, single user, no consistent breadcrumb pattern — suggest `snooze`:
+For issues where the sub-agent saw a single occurrence, single user, no consistent breadcrumb pattern — ask via `AskUserQuestion` (header `"Snooze?"`):
 
-```text
-mcp__owlmetry__snooze-issue  project_id=<id>  issue_id=<X>
-```
-
-Owlmetry auto-reverts a snoozed issue to `new` and re-fires the `issue.new` push on the **very next** occurrence. So if the one-off assumption holds, you never hear about it again. If it returns, you find out immediately. No version commitment required, no claim of "fix".
+- `Snooze — re-alert on next occurrence (Recommended)` — `snooze-issue`. Owlmetry auto-reverts to `new` and re-fires the `issue.new` push on the very next occurrence. No version commitment, no claim of "fix".
+- `Silence — stay silent even if it recurs` — `silence-issue`. Terminal; use for transient infra blips you've decided to live with.
+- `Investigate anyway` — fall through to the regular fix flow.
+- `Skip — leave open` — no change.
 
 ## Step 9 — Merge duplicates
 
-If two issues describe the same underlying bug (the sub-agent reports overlap on `_error_stack` or root cause), pick the **older** issue as the target so its history is preserved:
+If two issues describe the same underlying bug (the sub-agent reports overlap on `_error_stack` or root cause), pick the **older** issue as the target so its history is preserved. Confirm via `AskUserQuestion` (header `"Merge?"`) — merges are not reversible through the API:
 
-```text
-mcp__owlmetry__merge-issues  project_id=<id>  target_issue_id=<older>  source_issue_id=<newer>
-```
+- `Merge #<newer> → #<older> (Recommended)` — calls `merge-issues` with `target_issue_id=<older>`, `source_issue_id=<newer>`. Moves every fingerprint, occurrence (deduped), and comment from source into target, then deletes source.
+- `Keep separate — they're different bugs` — no change; log the user's reasoning back as an `add-issue-comment` on both so the next investigator doesn't re-propose the same merge.
+- `Pick a different target` — falls through to "Other"; user types the target issue ID.
 
-This moves every fingerprint, occurrence (deduped), and comment from source into target, then deletes source. Confirm with the user first — merges are not reversible through the API.
+Use the `preview` field to show a side-by-side summary of the two issues (title, fingerprints, last_seen versions) so the user can compare before committing.
 
 ## Step 10 — End-of-session recap
 
@@ -284,55 +307,72 @@ Every step has both a MCP tool and a CLI fallback. Pick one transport per run �
 
 ## Typical workflow (end-to-end)
 
+User runs `/owlmetry-investigate-issues`. Agent narration in chat, decisions via `AskUserQuestion`.
+
 ```text
-User: /owlmetry-investigate-issues
+You (chat):  Detected project Lofi (owl_proj_8f3…). Pulling issues…
+             Found 14 issues to investigate: 11 new, 3 regressed ⚠️
+             Spawning 5 investigation sub-agents (batch 1 of 3)…
+             [sub-agents run in parallel, each posts a comment per issue]
+             …batch 2 of 3 done
+             …batch 3 of 3 done
 
-You:  Detected project Lofi (owl_proj_8f3…). Pulling issues…
-      Found 14 issues to investigate: 11 new, 3 regressed ⚠️
-      Spawning 5 investigation sub-agents (batch 1 of 3)…
-      [sub-agents run in parallel, each posts a comment per issue]
-      …batch 2 of 3 done
-      …batch 3 of 3 done
+             | # | Issue | Users | Occ. | Versions | Suggested | Why |
+             | 1 | ⚠️ Regressed: Crash in SignatureRenderer.export | 42 | 318 | 1.4.0 (latest) | fix-now | … |
+             | 2 | Network error: POST api.revenuecat.com/v1/receipts | 28 | 121 | 1.3.5–1.4.0 | downgrade-sdk-call | … |
+             …
 
-      | # | Issue | Users | Occ. | Versions | Suggested | Why |
-      | 1 | ⚠️ Regressed: Crash in SignatureRenderer.export | 42 | 318 | 1.4.0 (latest) | fix-now | … |
-      | 2 | Network error: POST api.revenuecat.com/v1/receipts | 28 | 121 | 1.3.5–1.4.0 | downgrade-sdk-call | … |
-      …
+             Top fix-now is #1 (regressed, on current release). 3 network issues are downgrade candidates. #11 and #4 share a stack.
 
-      Recommendation:
-      - Start with #1 — regressed, affects current release.
-      - Batch-downgrade candidates: #2, #5, #8 (network errors with graceful UX).
-      - Merge candidates: #11 → #4 (same _error_stack).
-      - Stale: #4 (all occurrences on 1.3.0; current is 1.4.0).
+AskUserQuestion (header "First issue"):
+  ◉ Fix #1 — Crash in SignatureRenderer.export (Recommended)
+  ○ Batch downgrade 3 network issues
+  ○ Merge #11 → #4
+  ○ Stop for now
 
-      Pick a row (1–14), or `batch-downgrade`, `batch-resolve-stale`, or `merge 11→4`.
+User picks: Fix #1
 
-User: 1
+AskUserQuestion (header "Claim?"):
+  ◉ Claim and start (Recommended)
+  ○ Investigate without claiming
+  ○ Cancel
 
-You:  Claim issue #1 (OWL-A12) — sets status to in_progress, visible to team?
+User picks: Claim and start
+[claim-issue called]
 
-User: yes
-      [claim-issue called]
-      Searching for the call site of SignatureRenderer.export…
-      Found at SignatureCreator/Renderers/SignatureRenderer.swift:142
-      The stack points at a force-unwrap on `selectedFont`. Suggested fix: guard let, fall back to system font.
-      [edits made]
+You (chat):  Searching for the call site… Found at
+             SignatureCreator/Renderers/SignatureRenderer.swift:142 — force-unwrap
+             on `selectedFont`. Suggested fix: `guard let`, fall back to system font.
+[edit proposed and applied]
 
-      What version will this ship in? Current Info.plist version is 1.4.0; I can bump to 1.4.1.
+AskUserQuestion (header "Version"):
+  ◉ Bump to 1.4.1 (Recommended)     [preview: Info.plist diff]
+  ○ Bump to 1.5.0                   [preview: Info.plist diff]
+  ○ Don't bump now
 
-User: yes 1.4.1
-      [version bumped, user commits + ships]
+User picks: Bump to 1.4.1
+[version bumped]
 
-You:  Mark OWL-A12 as resolved at 1.4.1?
+AskUserQuestion (header "Resolve?"):
+  ◉ Resolve at v1.4.1 (Recommended)
+  ○ Snooze instead
+  ○ Silence instead
+  ○ Cancel
 
-User: yes
-      [resolve-issue called]
-      Resolved.
+User picks: Resolve at v1.4.1
+[resolve-issue called]
 
-      Next issue, or done?
+You (chat):  Resolved.
 
-User: done
+AskUserQuestion (header "Next?"):
+  ◉ Continue with row #2 (Recommended)
+  ○ Pick a different row
+  ○ Done
 
-You:  Session summary for Lofi:
-      …
+User picks: Done
+
+You (chat):  Session summary for Lofi:
+               Claimed:        1  → OWL-A12
+               Resolved:       1  → OWL-A12 at v1.4.1
+               Comments added: 14
 ```
