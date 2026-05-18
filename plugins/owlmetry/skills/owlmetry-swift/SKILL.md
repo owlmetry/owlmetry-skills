@@ -652,6 +652,117 @@ If you don't apply `.tint()` explicitly, the view inherits the enclosing `Naviga
 
 Submissions show up on **Dashboard → Feedback** as a kanban with four statuses (`new → in_review → addressed → dismissed`). Humans, the CLI (`owlmetry feedback`), and MCP agents can all read and triage it.
 
+## Collect Structured Surveys (Questionnaires)
+
+Questionnaires are short multi-question surveys (text / single-choice / multi-choice / 1–5 rating / 0–10 NPS) shown in-app via a SwiftUI view modifier. Where `OwlFeedbackView` collects one free-text message, an `OwlQuestionnaireView` walks the user through a typed schema you author once on the server.
+
+### Prerequisite — create the questionnaire first
+
+The Swift SDK only reads and submits — it does **not** define questionnaires. Create one before instrumenting the app:
+
+- Dashboard → Questionnaires → **New questionnaire** (fill slug + name + schema JSON)
+- CLI: `owlmetry questionnaires create --project-id <id> --slug post-onboarding --name "Onboarding survey" --schema-file ./schema.json`
+- MCP: the `create-questionnaire` tool (agents can author short market-research surveys autonomously)
+
+Slug is immutable after creation — pick the SDK call-site name carefully (`post-onboarding`, `weekly-checkin`, etc.).
+
+### Auto-trigger view modifier (primary path)
+
+```swift
+import SwiftUI
+import Owlmetry
+
+struct RootView: View {
+    var body: some View {
+        TabView { ... }
+            .owlQuestionnaire(
+                slug: "post-onboarding",
+                trigger: .afterLaunches(3)
+            )
+    }
+}
+```
+
+When the trigger fires AND the user is server-side eligible (not already responded, not globally dismissed), the SDK fetches the latest schema and presents `OwlQuestionnaireView` in a sheet automatically.
+
+### Composable triggers (ANDed conditions)
+
+```swift
+.owlQuestionnaire(
+    slug: "weekly-checkin",
+    trigger: .when(
+        .launches(atLeast: 3),
+        .daysSinceFirstLaunch(atLeast: 7)
+    )
+)
+```
+
+Conditions: `.launches(atLeast:)`, `.foregrounds(atLeast:)`, `.daysSinceFirstLaunch(atLeast:)`, `.hoursSinceFirstLaunch(atLeast:)`. Shortcuts: `.afterLaunch`, `.afterLaunches(n)`, `.manual` (never auto-trigger).
+
+OR-logic isn't built in. Use `isEligible: { ... }` for custom gating, or attach two modifiers with different slugs.
+
+### Gating (free vs paid, feature flags, etc.)
+
+```swift
+.owlQuestionnaire(
+    slug: "free-user-survey",
+    trigger: .afterLaunch,
+    isEligible: { !user.isPaid }
+)
+```
+
+`isEligible` runs synchronously on the main thread before the SDK fetches the spec. Return `false` to skip this evaluation; it re-runs on the next foreground.
+
+### Tint
+
+`tint: Color?` is propagated through the sheet's environment to the Submit button, rating stars, single-choice checkmarks, and multi-choice toggles. Omit it to inherit your app's accent color.
+
+```swift
+.owlQuestionnaire(slug: "...", trigger: .afterLaunch, tint: .orange)
+```
+
+### Manual presentation
+
+For ad-hoc triggers ("show after the user finishes the import wizard"), fetch + present yourself:
+
+```swift
+@State private var spec: OwlQuestionnaire?
+@State private var show = false
+
+Button("Take a quick survey") {
+    Task {
+        if let q = try? await Owl.fetchQuestionnaire(slug: "post-import") {
+            spec = q
+            show = true
+        }
+        // nil means user is ineligible (already responded / globally dismissed / inactive)
+    }
+}
+.sheet(isPresented: $show) {
+    if let spec {
+        NavigationStack {
+            OwlQuestionnaireView(questionnaire: spec, onSubmitted: { _ in show = false }, onCancel: { show = false })
+        }
+    }
+}
+```
+
+### Programmatic dismissal
+
+```swift
+try await Owl.dismissQuestionnaires()
+```
+
+Globally opts the current user out of every questionnaire. Idempotent. Survives reinstall (stored server-side on `app_users.properties`).
+
+### Where responses land
+
+Responses show up on **Dashboard → Questionnaires → &lt;questionnaire&gt;** with pre-aggregated per-question analytics (bar charts for choices, average for ratings, NPS score for NPS). Each response stores the schema_snapshot it was submitted against, so editing the questionnaire later never retroactively breaks historical rendering. CLI: `owlmetry questionnaires …`. MCP: `list-questionnaires` / `list-questionnaire-responses` / `get-questionnaire-analytics`.
+
+### Privacy
+
+Same model as feedback — answers are user-typed into a dev-rendered form. No new automatic data categories beyond what the feedback flow already declares.
+
 ## What the SDK Tracks Automatically
 
 Do not re-implement any of these — they are built into the SDK and emitted without any code:

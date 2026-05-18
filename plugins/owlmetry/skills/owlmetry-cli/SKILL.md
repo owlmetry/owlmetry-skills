@@ -208,6 +208,18 @@ owlmetry feedback status <feedbackId> --project-id <id> --to new|in_review|addre
 owlmetry feedback comment <feedbackId> --project-id <id> --body "..." --format json
 owlmetry feedback delete <feedbackId> --project-id <id>  # user-only; agent keys get 403
 
+# Questionnaires (in-app structured surveys — text / single_choice / multi_choice / rating / nps)
+owlmetry questionnaires list --project-id <id> [--app-id <id>] [--active | --inactive] [--limit <n>] --format json
+owlmetry questionnaires create --project-id <id> --slug <s> --name "..." --schema-file path/to/schema.json [--description "..."] [--app-id <id>] [--inactive] --format json
+owlmetry questionnaires view <questionnaireId> --project-id <id> --format json
+owlmetry questionnaires update <questionnaireId> --project-id <id> [--name "..."] [--description "..."] [--schema-file path] [--active true|false] [--app-id <id>|null] --format json
+owlmetry questionnaires delete <questionnaireId> --project-id <id>  # user-only; agent keys get 403
+owlmetry questionnaires responses <questionnaireId> --project-id <id> [--status new|in_review|addressed|dismissed] [--app-id <id>] [--dev] [--data-mode production|development|all] [--limit <n>] --format json
+owlmetry questionnaires response <responseId> --project-id <id> --questionnaire <id> --format json
+owlmetry questionnaires status <responseId> --project-id <id> --questionnaire <id> --to new|in_review|addressed|dismissed --format json
+owlmetry questionnaires comment <responseId> --project-id <id> --questionnaire <id> --body "..." --format json
+owlmetry questionnaires analytics <questionnaireId> --project-id <id> [--dev] [--data-mode production|development|all] --format json
+
 # Store reviews (text reviews — App Store / Play Store, Apple-only ingest currently)
 owlmetry reviews list --project-id <id> [--app-id <id>] [--store app_store|play_store] [--rating <1-5>] [--rating-lte <n>] [--rating-gte <n>] [--country <cc>] [--has-response | --no-response] [--search <text>] [--limit <n>] --format json
 owlmetry reviews view <reviewId> --project-id <id> --format json
