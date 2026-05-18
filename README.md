@@ -15,13 +15,14 @@ That's it. Claude Code clones this repo, registers the skills, and auto-updates 
 
 ## What you get
 
-The `owlmetry` plugin installs three skills:
+The `owlmetry` plugin installs four skills:
 
 | Skill | Use when |
 |-------|----------|
 | `owlmetry-cli` | Signing up, creating projects and apps, defining metrics and funnels, querying events, triaging issues and feedback from the command line. |
 | `owlmetry-swift` | Instrumenting an iOS, iPadOS, or macOS app with the [Owlmetry Swift SDK](https://github.com/owlmetry/owlmetry-swift). |
 | `owlmetry-node` | Instrumenting a Node.js backend (Express, Fastify, serverless) with the [`@owlmetry/node`](https://www.npmjs.com/package/@owlmetry/node) SDK. |
+| `owlmetry-investigate-issues` | Triaging open issues for the current project — fans out sub-agents to read occurrences and breadcrumb timelines, compiles a prioritized breakdown, and walks you through claim → fix → resolve. |
 
 The CLI skill is the entry point — it handles auth, project/app creation, and knows how to hand off to the SDK skills once an app exists.
 
