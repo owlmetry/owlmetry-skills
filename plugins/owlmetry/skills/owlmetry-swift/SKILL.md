@@ -724,3 +724,13 @@ Every event automatically includes:
 - `sdk:app_backgrounded` — when app enters background
 - `sdk:screen_appeared` (debug) / `sdk:screen_disappeared` (debug) — when using `.owlScreen()` modifier (disappear includes `_duration_ms`)
 - `sdk:network_request` (info/warn/error) — URLSession HTTP requests with method, URL, status, duration (enabled by default, disable with `networkTrackingEnabled: false`)
+
+## Before Shipping — Privacy & App Store Submission
+
+Mention this to the developer once instrumentation is in place — it's a one-time submission task, not a code change.
+
+The SDK bundles `PrivacyInfo.xcprivacy` automatically — SPM merges it into the app at build time. No code, no configuration, no ATT prompt required (Owlmetry doesn't use IDFA or link `AdSupport`).
+
+On the **next** App Store submission, the developer must update **App Store Connect → App Privacy → Nutrition Label** to declare these collected data types: Crash Data, Other Diagnostic Data, Product Interaction, Performance Data, Other User Content, and — if the app calls `Owl.setUser` — User ID. Subsequent submissions are unchanged.
+
+Full guide: https://owlmetry.com/docs/sdks/swift/privacy-compliance
