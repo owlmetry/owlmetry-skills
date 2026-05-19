@@ -3,14 +3,16 @@ name: owlmetry-cli
 description: >-
   Install the Owlmetry CLI, sign up, and manage projects, apps, metrics,
   funnels, events, issues (clustered errors), feedback, questionnaires
-  (structured surveys / NPS), App Store reviews and per-country ratings,
-  ad campaigns / spend / ROAS, attachments, integrations (RevenueCat, App
-  Store Connect, Apple Search Ads), and notifications. Use when adding
-  Owlmetry to a project, querying analytics, triaging issues, replying to
-  reviews, managing surveys, or when another Owlmetry skill needs CLI setup
-  as a prerequisite. IMPORTANT: You MUST load this skill before running
-  ANY `owlmetry` CLI command. The CLI has non-obvious subcommand syntax
-  and flags — do not guess.
+  (structured surveys / NPS with progressive draft saves and abandonment
+  analytics), App Store reviews and per-country ratings, ad campaigns /
+  spend / ROAS, attachments, integrations (RevenueCat, App Store Connect,
+  Apple Search Ads), and notifications. Use when adding Owlmetry to a
+  project, querying analytics, triaging issues, replying to reviews,
+  managing surveys, listing draft / submitted questionnaire responses, or
+  when another Owlmetry skill needs CLI setup as a prerequisite.
+  IMPORTANT: You MUST load this skill before running ANY `owlmetry` CLI
+  command. The CLI has non-obvious subcommand syntax and flags — do not
+  guess.
 allowed-tools: Bash
 ---
 
@@ -219,11 +221,18 @@ owlmetry questionnaires create --project-id <id> --slug <s> --name "..." --schem
 owlmetry questionnaires view <questionnaireId> --project-id <id> --format json
 owlmetry questionnaires update <questionnaireId> --project-id <id> [--name "..."] [--description "..."] [--schema-file path] [--active true|false] [--app-id <id>|null] --format json
 owlmetry questionnaires delete <questionnaireId> --project-id <id>  # user-only; agent keys get 403
-owlmetry questionnaires responses <questionnaireId> --project-id <id> [--status new|in_review|addressed|dismissed] [--app-id <id>] [--dev] [--data-mode production|development|all] [--limit <n>] --format json
+owlmetry questionnaires responses <questionnaireId> --project-id <id> [--status draft|new|in_review|addressed|dismissed] [--app-id <id>] [--dev] [--submitted-only] [--data-mode production|development|all] [--limit <n>] --format json
+# Drafts (progressive saves where the user tapped Next but not Submit) show
+# up by default. --submitted-only hides them; --status draft flips it to
+# drafts-only. Each response carries `is_complete`, `submitted_at`, and
+# `status: "draft"` until completion.
 owlmetry questionnaires response <responseId> --project-id <id> --questionnaire <id> --format json
 owlmetry questionnaires status <responseId> --project-id <id> --questionnaire <id> --to new|in_review|addressed|dismissed --format json
 owlmetry questionnaires comment <responseId> --project-id <id> --questionnaire <id> --body "..." --format json
-owlmetry questionnaires analytics <questionnaireId> --project-id <id> [--dev] [--data-mode production|development|all] --format json
+owlmetry questionnaires analytics <questionnaireId> --project-id <id> [--dev] [--submitted-only] [--data-mode production|development|all] --format json
+# Analytics include drafts by default — a Q1-only draft lands in Q1's count
+# and naturally drops out of Q2+ (gives you the drop-off curve). Pass
+# --submitted-only to compute rollups against completed responses only.
 
 # Store reviews (text reviews — App Store / Play Store, Apple-only ingest currently)
 owlmetry reviews list --project-id <id> [--app-id <id>] [--store app_store|play_store] [--rating <1-5>] [--rating-lte <n>] [--rating-gte <n>] [--country <cc>] [--has-response | --no-response] [--search <text>] [--limit <n>] --format json

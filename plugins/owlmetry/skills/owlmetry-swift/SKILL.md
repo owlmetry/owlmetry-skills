@@ -3,11 +3,13 @@ name: owlmetry-swift
 description: >-
   Integrate the Owlmetry Swift SDK into an iOS, iPadOS, macOS, or watchOS
   app for analytics, event tracking, metrics, funnels, in-app
-  questionnaires (surveys / NPS / ratings), user feedback views, file
-  attachments, crash and error reporting, Apple Search Ads attribution,
-  and push notification registration. Use when instrumenting a Swift or
-  SwiftUI project with Owlmetry, building surveys, capturing feedback,
-  attaching files to events, or wiring Apple Search Ads attribution.
+  questionnaires (surveys / NPS / ratings) with progressive draft saves
+  and resume-mid-flow, user feedback views, file attachments, crash and
+  error reporting, Apple Search Ads attribution, and push notification
+  registration. Use when instrumenting a Swift or SwiftUI project with
+  Owlmetry, building surveys, resuming half-finished questionnaire
+  drafts, capturing feedback, attaching files to events, or wiring Apple
+  Search Ads attribution.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 
@@ -823,6 +825,8 @@ struct RootView: View {
 
 When the trigger fires AND the user is server-side eligible (not already responded, not globally dismissed), the SDK opens a **non-swipe-dismissible** sheet at a small "Quick favor?" consent detent with three buttons: **Sure, happy to help** (expands to the full step flow), **Maybe later** (closes; re-evaluates next foreground), and **Don't ask again** (writes the global dismiss flag after a confirmation). Once accepted, questions render one-per-page with a top progress bar and Back / Next / Submit; on submit, an in-sheet success page (✓ + Thanks + Done) replaces the questions.
 
+**Progressive saves + resume** — answers persist to the server on every Next tap, not just on Submit. If the user quits mid-flow, the next eligible launch's auto-trigger picks the draft up automatically: the SDK fetches the spec, sees the saved draft, skips the consent detent, and lands the user at the first unanswered question with prior answers pre-filled. No extra code on your side. Drafts survive process restarts and reinstalls (keyed server-side on user_id), and the team `questionnaire.response_new` notification only fires on the final Submit — partial saves are silent.
+
 Pass `showsConsent: false` to skip the consent prompt and go straight to the step flow:
 
 ```swift
@@ -884,28 +888,58 @@ The consent prompt's title, body, and three button labels are all overridable vi
 
 ### Manual presentation
 
-For ad-hoc triggers ("show after the user finishes the import wizard"), fetch + present yourself:
+For ad-hoc triggers ("show after the user finishes the import wizard"), fetch + present yourself. `fetchQuestionnaire` returns a result wrapping the spec + any in-progress draft for the current user:
 
 ```swift
 @State private var spec: OwlQuestionnaire?
+@State private var inProgress: OwlQuestionnaireDraft?
 @State private var show = false
 
 Button("Take a quick survey") {
     Task {
-        if let q = try? await Owl.fetchQuestionnaire(slug: "post-import") {
+        let result = try? await Owl.fetchQuestionnaire(slug: "post-import")
+        if let q = result?.questionnaire {
             spec = q
+            inProgress = result?.inProgress  // optional draft to resume from
             show = true
         }
-        // nil means user is ineligible (already responded / globally dismissed / inactive)
+        // questionnaire == nil → user is ineligible (already responded /
+        // globally dismissed / inactive). result.ineligibleReason carries
+        // the specific reason for diagnostics.
     }
 }
 .sheet(isPresented: $show) {
     if let spec {
         NavigationStack {
-            OwlQuestionnaireView(questionnaire: spec, onSubmitted: { _ in show = false }, onCancel: { show = false })
+            OwlQuestionnaireView(
+                questionnaire: spec,
+                inProgress: inProgress,                  // resumes mid-flow
+                showsConsent: inProgress == nil,        // skip consent on resume
+                onSubmitted: { _ in show = false },
+                onCancel: { show = false }
+            )
         }
     }
 }
+```
+
+Answers persist per Next tap. If the user quits halfway, the next eligible launch's `fetchQuestionnaire` returns `inProgress` carrying their saved answers; pass it to `OwlQuestionnaireView` to resume at the first unanswered question with prior answers pre-filled.
+
+### One-shot save (advanced)
+
+For consumers building a fully custom UI on top of the SDK, `Owl.saveQuestionnaireResponse` is the underlying API. The auto modifier and `OwlQuestionnaireView` call this for you; only reach for it directly if you're rolling your own flow.
+
+```swift
+let receipt = try await Owl.saveQuestionnaireResponse(
+    slug: "post-import",
+    answers: ["q_text": .text("Loved it"), "q_rating": .rating(5)],
+    isComplete: true       // false to save a draft, true to finalize
+)
+// receipt.wasSubmitted == true on the call that flipped the response to
+// submitted (drives transition to your success view). Draft saves return
+// wasSubmitted == false; the server merges incoming keys onto the existing
+// row keyed by (project, slug, user_id) — no client-side response_id
+// tracking needed.
 ```
 
 ### Programmatic dismissal
