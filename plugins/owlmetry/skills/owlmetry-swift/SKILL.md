@@ -257,7 +257,7 @@ Events are the core unit of data in Owlmetry. Use the four log levels to capture
 - **`warn`** — something didn't go as expected but the app can continue: failed validation, precondition checks that fail, slow responses, fallback paths taken, deprecated API usage, missing optional data.
 - **`error`** — a caught exception or hard failure inside a `do`/`catch` block: network errors, JSON decode failures, file I/O errors, keychain access failures. Reserve for actual thrown errors, not for anticipated validation outcomes.
 
-Choose **message strings** that are specific and searchable. Prefer `"Failed to load profile image"` over `"error"`. Use `screenName` to tie events to where they happened in the UI. Use `attributes` for structured data you'll want to filter or search on later.
+Choose **message strings** that are specific and searchable (`"Failed to load profile image"` over `"error"`). Use `screenName` to tie events to where they happened in the UI. For the full rubric on what to log, what to attach, and what to skip, see *Instrumentation Principles* below.
 
 `message` is silently truncated to 2000 characters; attribute values are silently truncated to 200 characters. Put long content in `attributes`, not in `message`.
 
@@ -307,6 +307,128 @@ The same applies to every method on `Owl` and `OwlOperation` that takes an `attr
 Source file, function, and line are auto-captured.
 
 **Avoid logging PII** (emails, phone numbers, passwords) or high-frequency events (every frame, every scroll position). Focus on actions and outcomes.
+
+## Instrumentation Principles
+
+Before adding `info` / `warn` / `error` calls throughout the app, internalise these four rules. They turn the SDK from a logger into a queryable analytics surface.
+
+### 1. Log outcomes, not steps
+
+Emit **one rich event per user-meaningful outcome**, not one event per line of code. The unit is the *thing that happened* (purchase completed, photo uploaded, document opened, sign-in succeeded), not the work your code did to make it happen.
+
+Don't narrate the action:
+```swift
+Button("Buy") {
+    Owl.info("Buy tapped", screenName: "Paywall")
+    Owl.info("Validating receipt", screenName: "Paywall")
+    Owl.info("Calling StoreKit", screenName: "Paywall")
+    Owl.info("Receipt validated", screenName: "Paywall")
+    Owl.info("Unlocking feature", screenName: "Paywall")
+}
+```
+
+One event with the full context:
+```swift
+Button("Buy") {
+    let startedAt = Date()
+    Task {
+        do {
+            try await store.purchase(product)
+            Owl.info("Subscription purchased", screenName: "Paywall", attributes: [
+                "product_id": product.id,
+                "price_locale": product.priceLocale.identifier,
+                "introductory_offer": product.hasIntroOffer ? "yes" : "no",
+                "duration_ms": "\(Int(Date().timeIntervalSince(startedAt) * 1000))",
+            ])
+        } catch {
+            Owl.error(error, "purchase failed", screenName: "Paywall", attributes: [
+                "product_id": product.id,
+            ])
+        }
+    }
+}
+```
+
+`.owlScreen()` already gives you one event per *screen visit* with `_duration_ms` — that **is** the canonical "log the outcome, not the steps" pattern for navigation. Don't supplement it with extra `Owl.info("View appeared")` calls. Apply the same instinct to button taps, gestures, and lifecycle handlers: one event per *user decision* with all the relevant context attached.
+
+For intermediate diagnostic signals (cache hits, state transitions, fallback decisions), use `debug` level — filtered out of production data mode automatically.
+
+### 2. Pack attributes wide, not events deep
+
+One event with 12 attributes beats 12 events with one attribute each. For a client-side event, think through these axes and attach whatever's relevant:
+
+| Axis | iOS examples |
+|---|---|
+| **Who** | `user_id` (auto from `setUser`), `subscription_status`, `plan_tier`, `account_age_days` |
+| **What** | `product_id`, `document_id`, `playlist_id`, `feature_flag`, `notification_id` |
+| **Where** | `screenName` (only when the event is tied to a visible screen), navigation source (`from_screen`) |
+| **How** | `entry_point` (push / deeplink / cold_start), `gesture`, `format`, `source_of_truth` (cache / network), `retry_count` |
+| **How much** | `duration_ms`, `item_count`, `size_bytes`, `network_kb`, `position_seconds` |
+
+The SDK auto-attaches a lot for free — don't re-emit any of these manually:
+
+- Device model, OS version, locale, `_connection` (wifi / cellular / offline), `app_version`, `build_number`, `is_dev`, `environment` (ios / ipados / macos / watchos) — on every event.
+- `_http_method` / `_http_url` (query-stripped) / `_http_status` / `_http_duration_ms` / `_http_response_size` / `_http_error` — auto-captured for every completion-handler `URLSession` request via `networkTrackingEnabled` (default on).
+- `screenName` + `_duration_ms` — auto-captured per screen via `.owlScreen()`.
+
+High-cardinality *attribute values* (document IDs, playlist IDs, user IDs) are a **feature**, not a smell — they let you triage a specific user's broken session from a dashboard chart. The thing to control is *event frequency* (rule 3), not value uniqueness.
+
+### 3. Aggregate hot paths; don't log per iteration
+
+Anywhere a callback fires repeatedly — `CADisplayLink`, `Timer.publish`, scroll observers, animation `.onChange`, `NotificationCenter` chains, batch processors — log the **outcome**, not each invocation:
+
+```swift
+// Per-frame log — thousands of events for a single scroll
+.onChange(of: scrollOffset) { newOffset in
+    Owl.debug("Scroll moved", attributes: ["offset": "\(newOffset)"])
+}
+
+// Meaningful endpoint — one event when the user reaches a state worth knowing
+.onChange(of: scrollOffset) { newOffset in
+    if newOffset > thresholdToLoadMore {
+        Owl.info("Reached bottom of feed", screenName: "Feed", attributes: [
+            "items_visible": "\(visibleItems.count)",
+            "loaded_pages": "\(loadedPages)",
+        ])
+    }
+}
+```
+
+Same for batch work:
+
+```swift
+// Per-item — one event per photo
+for photo in pendingPhotos {
+    Owl.info("Photo uploaded", attributes: ["id": photo.id])
+}
+
+// Per-session — one event for the whole upload
+let startedAt = Date()
+var failed = 0
+for photo in pendingPhotos {
+    do { try await upload(photo) }
+    catch { failed += 1 }
+}
+Owl.info("Photo backup completed", attributes: [
+    "uploaded": "\(pendingPhotos.count - failed)",
+    "failed": "\(failed)",
+    "duration_ms": "\(Int(Date().timeIntervalSince(startedAt) * 1000))",
+])
+```
+
+Same rule for `URLSession` retry chains, Combine `.retry(n)` operators, and SwiftUI `task` blocks that poll: log the final outcome with `retry_count`, not one event per attempt.
+
+### 4. Log, metric, or funnel — pick by the question you want answered
+
+- **Log event** (`Owl.info` / `warn` / `error`) — *"show me individual records of a specific thing that happened."* User actions, error context, edge cases. Read on Dashboard → Events.
+- **Lifecycle metric** (`Owl.startOperation` → `.complete` / `.fail` / `.cancel`) — *"show me p50/p95/p99 duration and success rate of this operation over time."* Photo uploads, image processing, model loads, API round-trips. Requires server-side metric definition. Read on Dashboard → Metrics.
+- **Single-shot metric** (`Owl.recordMetric`) — *"show me this point-in-time value trended."* Cold-start time, items in cart, memory usage at a checkpoint.
+- **Funnel** (`Owl.step`) — *"show me where users drop off across this multi-step flow."* Onboarding, checkout, key conversions. Requires server-side funnel definition.
+- **Screen view** (`.owlScreen("Name")`) — *"show me which screens are most/least visited and time-on-screen distributions."* One modifier per screen; covers appear + disappear + duration with zero manual calls. **Always prefer this over a manual `Owl.info("Screen viewed")`.**
+
+The same flow can warrant several: an onboarding sequence gets `.owlScreen()` on each step, a funnel for conversion across the sequence, a lifecycle metric on the longest single step (e.g. "create-account"), and `Owl.error` on any catch path for triage.
+
+> When in doubt, write one event with more attributes rather than several events with fewer.
 
 ## File Attachments (use sparingly)
 
@@ -837,11 +959,22 @@ When instrumenting a new app, follow this priority:
 - Services, utilities, background tasks: log freely but **never pass `screenName`** — these are not screen-bound
 - Metrics: wrap the async operation between `startOperation()` and `complete()`/`fail()`
 
-**What NOT to instrument:**
-- PII (emails, phone numbers, passwords, tokens)
-- Every UI interaction (every tap, every scroll)
-- High-frequency timer events
-- Sensitive business data (prices, payment details)
+**What NOT to instrument — concrete list:**
+
+Never put these in event messages or attribute values (the message and attribute caps don't redact, they just truncate):
+- Auth tokens (Firebase ID tokens, OAuth tokens, JWT contents), Keychain payloads, biometric data
+- Passwords, PIN codes, recovery phrases
+- Raw card numbers / CVVs / bank account numbers / SSNs
+- Full HTTP request/response bodies — the auto-network-tracking already emits `_http_url` (query-stripped), `_http_method`, `_http_status`, `_http_duration_ms`, `_http_response_size`, `_http_error`; don't supplement with payload bytes
+- Personal-content text the user typed into your app (notes, messages, journal entries) — `Owl.sendFeedback` / `OwlFeedbackView` is the user-consented path for that
+- Raw `error.localizedDescription` if it embeds user input — pass the `Error` to `Owl.error()` instead; the SDK extracts type, NSError domain/code, cause chain, and call stack into reserved `_error_*` attributes with proper fingerprinting
+
+Skip — these are usually noise, not value:
+- Every tap / scroll / drag / pinch — `.owlScreen()` already gives you one event per screen-visit; only log taps that represent a *user decision* (purchase, share, delete, submit)
+- Frame-rate / per-tick events from CADisplayLink, Combine `.publisher(every:)`, or animation callbacks
+- Per-row events inside batch import / sync loops (log the batch outcome with counts — see *Instrumentation Principles* rule 3)
+- Per-attempt logs on URLSession retry chains (log the final outcome with `retry_count`)
+- Sensitive business amounts on a per-event basis if user-aggregated revenue is what you want — use `setUserProperties` or the RevenueCat integration
 
 ## Lifecycle
 

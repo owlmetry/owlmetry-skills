@@ -114,7 +114,7 @@ Events are the core data unit. Use the four log levels to capture different kind
 - **`warn`** — something didn't go as expected but the process can continue: failed validation, precondition checks that fail, slow queries, rate limits approaching, fallback paths, deprecated API usage, missing optional config.
 - **`error`** — a caught exception or hard failure inside a `try`/`catch`: database connection errors, external API timeouts, unhandled rejections, file system errors. Reserve for actual thrown errors, not for anticipated validation outcomes.
 
-Choose **message strings** that are specific and searchable. Prefer `"Payment processing failed"` over `"error occurred"`. Use attributes for structured data you'll filter on later.
+Choose **message strings** that are specific and searchable (`"Payment processing failed"` over `"error occurred"`). For the full rubric on what to log, what to attach, and what to skip, see *Instrumentation Principles* below.
 
 ```typescript
 Owl.info('Server started', { port: 4000 });
@@ -155,6 +155,106 @@ try {
   Owl.error(err, 'Stripe charge failed', { endpoint: '/charges' });
 }
 ```
+
+## Instrumentation Principles
+
+Before adding `info` / `warn` / `error` calls throughout the service, internalise these four rules. They turn the SDK from a logger into a queryable analytics surface.
+
+### 1. Log outcomes, not steps
+
+Emit **one rich event per request or job outcome**, not one event per line of code. The unit is the *thing the service did* (request handled, job completed, webhook processed, payment captured), not the work your code did to get there.
+
+Don't narrate the request:
+```ts
+app.post('/api/orders', async (req, res) => {
+  Owl.info('Order request received');
+  Owl.info('Validating payload');
+  Owl.info('Looking up user');
+  Owl.info('Charging card');
+  Owl.info('Order created');
+  res.json(order);
+});
+```
+
+One event per outcome, scoped to the request:
+```ts
+app.post('/api/orders', Owl.wrapHandler(async (req, res) => {
+  const startedAt = Date.now();
+  const order = await createOrder(req.body);
+  req.owl.info('Order placed', {
+    order_id: order.id,
+    item_count: order.items.length,
+    total_cents: order.totalCents,
+    payment_method: order.paymentMethod,
+    duration_ms: Date.now() - startedAt,
+  });
+  res.json(order);
+}));
+```
+
+`req.owl` is the per-request scoped instance set up in middleware (see *Per-Request User Scoping* and *Per-Request Session Scoping*). It carries `user_id` + client `session_id` automatically, so every event inside the request lifecycle correlates without re-passing them.
+
+For intermediate diagnostic signals (cache lookups, query plans, fallback decisions), use `debug` level — filtered out of production view by default. Don't pad `info` with code-narration noise.
+
+### 2. Pack attributes wide, not events deep
+
+One event with 15 attributes beats 15 events with one attribute each. For a server-side event, think through these axes and attach whatever's relevant:
+
+| Axis | Backend examples |
+|---|---|
+| **Who** | `user_id` (auto-tagged via `withUser(req.user.id)`), `org_id`, `plan_tier`, `api_key_id`, `tenant_id` |
+| **What** | `order_id`, `subscription_id`, `webhook_event_id`, `queue_message_id`, `feature_flag` |
+| **Where** | route `path`, `method` (auto if you log inside a request handler), `region`, `pod`, `service_name` (auto from configure) |
+| **How** | `payment_provider`, `auth_method`, `retry_count`, `fallback_taken`, `idempotency_key` |
+| **How much** | `duration_ms`, `status_code`, `response_size_bytes`, `rows_processed`, `amount_cents` |
+
+High-cardinality *attribute values* (user IDs, order IDs, request IDs) are a **feature**, not a smell — they let you click from a dashboard chart down to a specific failing request when triaging. The thing to control is *event frequency* (rule 3), not the uniqueness of values.
+
+### 3. Aggregate batch work; don't log per iteration
+
+If you're inside a `for` / `.forEach` / queue-drain / cron-fanout and reaching for `Owl.info`, stop. Either:
+
+- Log a single summary event after the batch with counts and totals, **or**
+- Use a structured lifecycle metric for the operation as a whole.
+
+```ts
+// Per-row — 10,000 events for one nightly job
+for (const row of rows) {
+  Owl.info('Processed row', { id: row.id });
+}
+
+// Per-batch — one event
+const startedAt = Date.now();
+let failed = 0;
+const failureSamples: string[] = [];
+for (const row of rows) {
+  try { await process(row); }
+  catch (err) {
+    failed++;
+    if (failureSamples.length < 5) failureSamples.push(String(err));
+  }
+}
+Owl.info('Nightly sync completed', {
+  job: 'user-export',
+  processed: rows.length,
+  failed,
+  failure_samples: failureSamples.join(' | '),
+  duration_ms: Date.now() - startedAt,
+});
+```
+
+Same rule for retries: log the final outcome with `retry_count`, not one event per attempt. Same for SSE / WebSocket frames, polling loops, and stream chunks — log the connection outcome (status, frame count, duration), not each frame.
+
+### 4. Log, metric, or funnel — pick by the question you want answered
+
+- **Log event** (`Owl.info` / `warn` / `error`) — *"show me individual records when a specific request went wrong."* One-off occurrences, exception context, audit trail. Read on Dashboard → Events.
+- **Lifecycle metric** (`Owl.startOperation` → `.complete` / `.fail` / `.cancel`) — *"show me p50/p95/p99 latency and success rate for this operation over time."* Requires server-side metric definition. Read on Dashboard → Metrics.
+- **Single-shot metric** (`Owl.recordMetric`) — *"show me this point-in-time value trended over time."* Queue depth, cache hit rate, active connections.
+- **Funnel** (`Owl.step`) — *"show me where users drop off across this multi-step backend flow."* Signup pipeline, payment processing, onboarding sequence. Requires server-side funnel definition. **Always inside a `withUser(...)` scope** — funnel analytics need a user ID to compute conversion.
+
+The same operation can warrant several: a checkout pipeline gets a funnel for conversion, a lifecycle metric on `process-payment` for latency + failure rate, and an `Owl.error` on the catch path for triage.
+
+> When in doubt, write one event with more attributes rather than several events with fewer.
 
 ## File Attachments (use sparingly)
 
@@ -494,8 +594,20 @@ When instrumenting a backend service, follow this priority:
 - Multi-step server-side flows you want to measure conversion on: signup pipeline, payment processing, onboarding sequence
 - Always use `Owl.withUser()` for funnel events — funnel analytics require user IDs to calculate conversion
 
-**What NOT to instrument:**
-- PII (emails, passwords, tokens, IP addresses)
-- High-frequency health checks or heartbeats
-- Every database query (instrument categories, not every call)
-- Sensitive business data (payment amounts, account balances)
+**What NOT to instrument — concrete list:**
+
+Never put these in event messages or attribute values (the message and attribute caps don't redact, they just truncate):
+- Secrets, API keys, bearer tokens, auth cookies, JWT contents, refresh tokens
+- Passwords (cleartext or hashed)
+- Raw card numbers / CVVs / bank account numbers / SSNs / national IDs
+- Full request bodies, full response bodies — log status + sizes + resource IDs instead
+- `Authorization` / `Cookie` / `Set-Cookie` header values
+- Raw IP addresses — the server stamps `country_code` automatically; finer geo doesn't belong in events
+- Raw `error.stack` as an attribute value — pass the `Error` to `Owl.error()` instead; the SDK extracts the stack into `_error_stack` with a 16K cap and the proper fingerprinting key
+
+Skip — these are usually noise, not value:
+- High-frequency health checks, heartbeats, keep-alives
+- Per-row logs inside batch jobs (log the batch outcome — see *Instrumentation Principles* rule 3)
+- Per-attempt logs on retries (log the final outcome with `retry_count`)
+- Every database query (instrument categories or wrap with a metric — see *Instrumentation Principles* rule 4)
+- Sensitive business amounts on a per-event basis if user-aggregated revenue is what you actually want — use user properties or the RevenueCat integration
