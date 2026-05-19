@@ -666,6 +666,18 @@ The Swift SDK only reads and submits — it does **not** define questionnaires. 
 
 Slug is immutable after creation — pick the SDK call-site name carefully (`post-onboarding`, `weekly-checkin`, etc.).
 
+### Question types — short vs long text
+
+`text` questions default to a single-line `TextField`. Set `"multiline": true` on the question to render a tall, rounded `TextEditor` (~5 lines, grows with input) — reach for it whenever the expected answer is a sentence or more, not just a phrase:
+
+```jsonc
+{ "id": "q_takeaway", "type": "text", "title": "One-line takeaway?", "placeholder": "Optional" }
+{ "id": "q_details",  "type": "text", "title": "Anything else?",      "multiline": true,
+  "placeholder": "Optional — tell us as much as you'd like" }
+```
+
+Both share the same 4000-character server cap. Choose `multiline` based on the answer shape you want, not the field length.
+
 ### Auto-trigger view modifier (primary path)
 
 ```swift
