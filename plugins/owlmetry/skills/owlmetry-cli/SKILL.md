@@ -162,7 +162,7 @@ owlmetry apps create --project-id <id> --name <name> --platform <platform> [--bu
 owlmetry apps update <id> --name <name> --format json
 
 # Metrics
-owlmetry metrics list --project-id <id> --format json
+owlmetry metrics list (--project-id <id> | --team-id <id>) --format json  # --team-id lists every metric across accessible projects in the team
 owlmetry metrics view <slug> --project-id <id> --format json
 owlmetry metrics create --project-id <id> --name <name> --slug <slug> [--lifecycle] [--description <desc>] --format json
 owlmetry metrics update <slug> --project-id <id> [--name <name>] [--description <desc>] --format json
@@ -171,7 +171,7 @@ owlmetry metrics events <slug> --project-id <id> [--phase <phase>] [--user-id <i
 owlmetry metrics query <slug> --project-id <id> [--since <time>] [--until <time>] [--app-id <id>] [--user-id <id>] [--group-by <field>] --format json
 
 # Funnels
-owlmetry funnels list --project-id <id> --format json
+owlmetry funnels list (--project-id <id> | --team-id <id>) --format json  # --team-id lists every funnel across accessible projects in the team
 owlmetry funnels view <slug> --project-id <id> --format json
 owlmetry funnels create --project-id <id> --name <name> --slug <slug> --steps-file <path> [--description <desc>] --format json
 owlmetry funnels update <slug> --project-id <id> --steps-file <path> --format json
@@ -311,7 +311,8 @@ Metrics are project-scoped definitions that tell Owlmetry what structured data t
 The metric definition must exist on the server **before** the SDK emits events for that slug, otherwise the server will reject the events.
 
 ```bash
-owlmetry metrics list --project-id <id> --format json                   # List all
+owlmetry metrics list --project-id <id> --format json                   # List for one project
+owlmetry metrics list --team-id <id> --format json                      # List across every accessible project in the team
 owlmetry metrics view <slug> --project-id <id> --format json           # View details
 owlmetry metrics create --project-id <id> --name <name> --slug <slug> [--lifecycle] [--description <desc>] --format json
 owlmetry metrics update <slug> --project-id <id> [--name <name>] [--description <desc>] --format json
@@ -333,7 +334,8 @@ Both modes group events by `user_id` — events with no `user_id` are excluded f
 Maximum 20 steps per funnel.
 
 ```bash
-owlmetry funnels list --project-id <id> --format json                   # List all
+owlmetry funnels list --project-id <id> --format json                   # List for one project
+owlmetry funnels list --team-id <id> --format json                      # List across every accessible project in the team
 owlmetry funnels view <slug> --project-id <id> --format json           # View details
 owlmetry funnels delete <slug> --project-id <id>
 ```
