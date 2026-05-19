@@ -214,7 +214,7 @@ owlmetry feedback comment <feedbackId> --project-id <id> --body "..." --format j
 owlmetry feedback delete <feedbackId> --project-id <id>  # user-only; agent keys get 403
 
 # Questionnaires (in-app structured surveys — text / single_choice / multi_choice / rating / nps)
-owlmetry questionnaires list --project-id <id> [--app-id <id>] [--active | --inactive] [--limit <n>] --format json
+owlmetry questionnaires list (--project-id <id> | --team-id <id>) [--app-id <id>] [--active | --inactive] [--limit <n>] --format json  # --team-id lists every questionnaire across accessible projects
 owlmetry questionnaires create --project-id <id> --slug <s> --name "..." --schema-file path/to/schema.json [--description "..."] [--app-id <id>] [--inactive] --format json
 owlmetry questionnaires view <questionnaireId> --project-id <id> --format json
 owlmetry questionnaires update <questionnaireId> --project-id <id> [--name "..."] [--description "..."] [--schema-file path] [--active true|false] [--app-id <id>|null] --format json
