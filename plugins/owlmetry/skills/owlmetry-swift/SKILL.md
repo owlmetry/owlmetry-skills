@@ -2,8 +2,12 @@
 name: owlmetry-swift
 description: >-
   Integrate the Owlmetry Swift SDK into an iOS, iPadOS, macOS, or watchOS
-  app for analytics, event tracking, metrics, and funnels.
-  Use when instrumenting a Swift or SwiftUI project with Owlmetry.
+  app for analytics, event tracking, metrics, funnels, in-app
+  questionnaires (surveys / NPS / ratings), user feedback views, file
+  attachments, crash and error reporting, Apple Search Ads attribution,
+  and push notification registration. Use when instrumenting a Swift or
+  SwiftUI project with Owlmetry, building surveys, capturing feedback,
+  attaching files to events, or wiring Apple Search Ads attribution.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 

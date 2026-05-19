@@ -2,8 +2,11 @@
 name: owlmetry-node
 description: >-
   Integrate the Owlmetry Node.js SDK into a backend service for server-side
-  analytics, event tracking, metrics, and funnels. Use when
-  instrumenting a Node.js, Express, Fastify, or serverless project with Owlmetry.
+  analytics, event tracking, metrics, funnels, unhandled error and exception
+  capture (uncaughtException / unhandledRejection), feedback forwarding from
+  your own frontend, and event attachments. Use when instrumenting a Node.js,
+  Express, Fastify, or serverless project with Owlmetry, capturing crashes,
+  forwarding feedback from a web frontend, or attaching files to events.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 

@@ -2,10 +2,15 @@
 name: owlmetry-cli
 description: >-
   Install the Owlmetry CLI, sign up, and manage projects, apps, metrics,
-  funnels, and events. Use when adding Owlmetry to a project, querying
-  analytics, or when another Owlmetry skill needs CLI setup as a prerequisite.
-  IMPORTANT: You MUST load this skill before running ANY `owlmetry` CLI
-  command. The CLI has non-obvious subcommand syntax and flags — do not guess.
+  funnels, events, issues (clustered errors), feedback, questionnaires
+  (structured surveys / NPS), App Store reviews and per-country ratings,
+  ad campaigns / spend / ROAS, attachments, integrations (RevenueCat, App
+  Store Connect, Apple Search Ads), and notifications. Use when adding
+  Owlmetry to a project, querying analytics, triaging issues, replying to
+  reviews, managing surveys, or when another Owlmetry skill needs CLI setup
+  as a prerequisite. IMPORTANT: You MUST load this skill before running
+  ANY `owlmetry` CLI command. The CLI has non-obvious subcommand syntax
+  and flags — do not guess.
 allowed-tools: Bash
 ---
 
