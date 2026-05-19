@@ -861,6 +861,20 @@ OR-logic isn't built in. Use `isEligible: { ... }` for custom gating, or attach 
 
 `isEligible` runs synchronously on the main thread before the SDK fetches the spec. Return `false` to skip this evaluation; it re-runs on the next foreground.
 
+### Previewing the questionnaire UI in debug
+
+Pass `forceShow: true` to bypass every local gate (trigger conditions, `isEligible`, per-process dedup) and ask the server to also ignore `alreadyResponded` and `globallyDismissed`. `inactive` is still respected. Lets a developer see the sheet without rigging up launch counts or resetting state. Wire it to a debug-menu toggle, env var, or `#if DEBUG` flag — defaults to `false`, so production users never trip it.
+
+```swift
+.owlQuestionnaire(
+    slug: "post-onboarding",
+    trigger: .when(.daysSinceFirstLaunch(atLeast: 7)),
+    forceShow: previewQuestionnaireToggle // your @State debug toggle
+)
+```
+
+Under `forceShow: true` the SDK also skips the per-process "shown" mark, so toggling off-then-on after dismissing the sheet re-presents it within the same session.
+
 ### Tint
 
 `tint: Color?` is propagated through the sheet's environment to the consent accept button, progress bar, rating stars, NPS chips, single/multi choice selected state, and the bottom Submit / Next / Done buttons. Omit it to inherit your app's accent color.
