@@ -794,6 +794,25 @@ The Swift SDK only reads and submits — it does **not** define questionnaires. 
 
 Slug is immutable after creation — pick the SDK call-site name carefully (`post-onboarding`, `weekly-checkin`, etc.).
 
+#### What end-users see vs what's internal
+
+**Critical for agents authoring questionnaires:** most of the spec is shown to end-users in the in-app sheet. Treat every text field below as user-facing copy unless explicitly marked internal.
+
+| Field | Where it shows | Visibility |
+|---|---|---|
+| `slug` | SDK call-site only (`.owlQuestionnaire(slug: "…")`) | 🔒 internal |
+| `name` | Dashboard tables + team email/in-app notifications (`questionnaire.response_new`) | 🔒 internal |
+| `description` | **In-app consent sheet body** under "Quick favor?" — replaces the default `consentBody` string when non-empty | 👁️ user-facing |
+| `schema.questions[].title` | Large header on the question page | 👁️ user-facing |
+| `schema.questions[].subtitle` | Secondary text under the question title | 👁️ user-facing |
+| `schema.questions[].placeholder` | Text-field placeholder | 👁️ user-facing |
+| `schema.questions[].options[].label` | Single/multi-choice row label | 👁️ user-facing |
+| `schema.questions[].id` | Wire format only (becomes the analytics column) | 🔒 internal |
+| `is_active` | Gates whether the SDK can fetch it | 🔒 internal |
+| `app_id` | Pins the questionnaire to a single app | 🔒 internal |
+
+⚠️ **Common pitfall**: `description` is *not* a private note for the team — it renders verbatim in the consent prompt. If you want a hidden author note, put it in your own ticket/doc system; the spec has no internal-only text field. If you fill `description` with `"draft — confirm wording w/ marketing"`, that exact string ends up under "Quick favor?" in production.
+
 ### Question types — short vs long text
 
 `text` questions default to a single-line `TextField`. Set `"multiline": true` on the question to render a tall, rounded `TextEditor` (~5 lines, grows with input) — reach for it whenever the expected answer is a sentence or more, not just a phrase:
@@ -822,6 +841,24 @@ struct RootView: View {
     }
 }
 ```
+
+#### Parameter reference
+
+Every parameter on `.owlQuestionnaire(...)` and `OwlQuestionnaireView`. 👁️ = produces user-facing UI; 🔒 = behaviour/gating only.
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `slug` | required | 🔒 Looks up the server-side spec. Must match the `slug` you used in `create-questionnaire`. |
+| `trigger` | `.afterLaunch` | 🔒 When to evaluate. See "Composable triggers" — `.afterLaunch`, `.afterLaunches(n)`, `.when(...)`, `.manual`. ANDed conditions. |
+| `showsConsent` | `true` | 👁️ When `true`, opens with the "Quick favor?" consent detent (Sure / Maybe later / Don't ask again). When `false`, jumps straight to question 1. |
+| `consentIcon` | `Image(systemName: "quote.bubble.fill")` | 👁️ Small icon at the top-left of the consent sheet. Pass `nil` to hide it. Pass any `Image` — typically a custom SF Symbol that matches the survey's tone. Ignored when `showsConsent: false`. |
+| `isEligible` | `nil` | 🔒 Sync closure on main thread; return `false` to skip. Use for app-side gating (paid status, feature flags). Re-evaluates on every foreground. |
+| `forceShow` | `false` | 🔒 Debug-only override that bypasses every local + most server gates (still respects `inactive`). Wire to a debug-menu toggle or `#if DEBUG`. Re-presents within the same session. |
+| `tint` | `nil` | 👁️ Accent colour for the consent accept button, progress bar, rating stars, NPS chips, choice selection, Submit/Next/Done. `nil` inherits the parent's accent. |
+| `strings` | `.default` | 👁️ Override every consent + flow string via `OwlQuestionnaireStrings.default.with(...)`. See "Custom consent copy" — but note `description` on the spec wins over `consentBody` when present. |
+| `onSubmitted` | `nil` | 🔒 Fires once on the call that flips the response to submitted. Receives `OwlQuestionnaireReceipt` with `id`, `createdAt`, `wasSubmitted`. |
+| `onCancel` | `nil` | 🔒 Fires when the user taps Maybe later, Cancel, or otherwise dismisses without submitting. |
+| `onDismissed` | `nil` | 🔒 Fires when the user taps Don't ask again and confirms the global opt-out. |
 
 When the trigger fires AND the user is server-side eligible (not already responded, not globally dismissed), the SDK opens a **non-swipe-dismissible** sheet at a small "Quick favor?" consent detent with three buttons: **Sure, happy to help** (expands to the full step flow), **Maybe later** (closes; re-evaluates next foreground), and **Don't ask again** (writes the global dismiss flag after a confirmation). Once accepted, questions render one-per-page with a top progress bar and Back / Next / Submit; on submit, an in-sheet success page (✓ + Thanks + Done) replaces the questions.
 
@@ -885,7 +922,12 @@ Under `forceShow: true` the SDK also skips the per-process "shown" mark, so togg
 
 ### Custom consent copy
 
-The consent prompt's title, body, and three button labels are all overridable via `OwlQuestionnaireStrings`. The questionnaire's server-side `description` overrides `consentBody` automatically when non-empty, so different surveys can carry their own pitch without per-call overrides.
+Two places set the text the user sees on the consent sheet — and **both render to end users**, neither is internal-only:
+
+1. **Per-questionnaire** — the spec's `description` field (set via dashboard / CLI / MCP at create or update time). When non-empty, it replaces the default consent body for that specific survey. This is the right place to write the actual pitch ("Short survey for paid-tier users — 30 seconds, helps us prioritise next month's features").
+2. **App-wide** — `OwlQuestionnaireStrings` overrides every consent string at the SDK call-site. Use this to translate or rebrand the surrounding chrome (title, button labels) across all surveys.
+
+The questionnaire's `description` always wins over `strings.consentBody` when both are set, so per-survey copy beats global defaults.
 
 ```swift
 .owlQuestionnaire(
