@@ -9,12 +9,11 @@ description: >-
   Apple Search Ads), notifications, and time-series rollups / stats
   (daily + hourly pre-aggregated counts for events / users / sessions /
   metric completions / funnel completions / questionnaire responses,
-  powering sparklines, trend queries, and backfills that survive raw-event
+  powering sparklines and trend queries that survive raw-event
   retention). Use when adding Owlmetry to a project, querying analytics,
   triaging issues, replying to reviews, managing surveys, listing draft /
-  submitted questionnaire responses, plotting trends, backfilling
-  aggregations, or when another Owlmetry skill needs CLI setup as a
-  prerequisite.
+  submitted questionnaire responses, plotting trends, or when another
+  Owlmetry skill needs CLI setup as a prerequisite.
   IMPORTANT: You MUST load this skill before running ANY `owlmetry` CLI
   command. The CLI has non-obvious subcommand syntax and flags — do not
   guess.
@@ -286,7 +285,7 @@ owlmetry jobs cancel <runId>
 # <kind> ∈ events | users | sessions | metric_completions | funnel_completions | questionnaire_responses
 # <grain> ∈ daily | hourly
 owlmetry stats <kind> <grain> (--project-id <id> | --team-id <id>) [--app-id <id>] [--days <n> | --hours <n> | --from <iso> --to <iso>] [--data-mode production|development|all] [--slug <slug>] [--include-current] --format json
-owlmetry stats backfill --team-id <id> --start <iso> --end <iso> [--grain daily|hourly] [--project-id <id>] [--notify] --format json
+# Backfilling rollups is an operator action with no CLI surface — run `pnpm backfill` in the monorepo on the prod VPS instead.
 ```
 
 ## Resource Management
@@ -580,13 +579,7 @@ Response shape (zero-padded — missing buckets render as `value: 0` so consumer
   "data": [{ "bucket": "2026-04-21", "value": 1240 }, ...] }
 ```
 
-**Backfill** — for first-time rollout (when an app already has months of raw events but the rollup tables are empty) or to repair a gap past the 3-bucket re-aggregation window:
-
-```bash
-owlmetry stats backfill --team-id <id> --start <iso> --end <iso> [--grain daily|hourly] [--project-id <id>] [--notify] --format json
-```
-
-This is a thin wrapper around `owlmetry jobs trigger stats_aggregate_daily` / `stats_aggregate_hourly` — same backing job, same idempotency. Each per-kind aggregator runs `DELETE` + two `INSERT … SELECT … GROUP BY` passes (per-app + project-rollup) inside a single transaction per bucket range, so re-running a backfill clears stale rows first — a row that disappeared at source (event later deleted, etc.) doesn't survive in the rollup. **Manual triggers are team-scoped** (`--team-id` required); omit `--project-id` to fan out across every project with activity in the range. `--start` / `--end` are inclusive; format is `YYYY-MM-DD` for `--grain daily` and ISO 8601 hour (`YYYY-MM-DDTHH:00`) for `--grain hourly`.
+**Backfill** — for first-time rollout (when an app already has months of raw events but the rollup tables are empty) or to repair a gap past the 3-bucket re-aggregation window: not exposed via CLI/MCP/API. The trigger-job route rejects `stats_aggregate_*` by design so a team-scoped agent key can't fire system-wide work. Backfills are an operator action — SSH into the production VPS, `cd /opt/owlmetry`, run `pnpm backfill`. It re-aggregates the trailing 365 days (daily + hourly) in one pass against the database directly, DELETE+INSERT idempotent so re-running is safe.
 
 ## Background Jobs
 
