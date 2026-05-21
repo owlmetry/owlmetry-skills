@@ -6,10 +6,15 @@ description: >-
   (structured surveys / NPS with progressive draft saves and abandonment
   analytics), App Store reviews and per-country ratings, ad campaigns /
   spend / ROAS, attachments, integrations (RevenueCat, App Store Connect,
-  Apple Search Ads), and notifications. Use when adding Owlmetry to a
-  project, querying analytics, triaging issues, replying to reviews,
-  managing surveys, listing draft / submitted questionnaire responses, or
-  when another Owlmetry skill needs CLI setup as a prerequisite.
+  Apple Search Ads), notifications, and time-series rollups / stats
+  (daily + hourly pre-aggregated counts for events / users / sessions /
+  metric completions / funnel completions / questionnaire responses,
+  powering sparklines, trend queries, and backfills that survive raw-event
+  retention). Use when adding Owlmetry to a project, querying analytics,
+  triaging issues, replying to reviews, managing surveys, listing draft /
+  submitted questionnaire responses, plotting trends, backfilling
+  aggregations, or when another Owlmetry skill needs CLI setup as a
+  prerequisite.
   IMPORTANT: You MUST load this skill before running ANY `owlmetry` CLI
   command. The CLI has non-obvious subcommand syntax and flags — do not
   guess.
@@ -276,6 +281,12 @@ owlmetry jobs list --team-id <id> [--type <type>] [--status <status>] [--project
 owlmetry jobs view <runId> --format json
 owlmetry jobs trigger <jobType> --team-id <id> --project-id <id> [--param key=value]... [--notify] [--wait] --format json
 owlmetry jobs cancel <runId>
+
+# Stats (time-series rollups — daily + hourly pre-aggregated counts that survive raw-event retention)
+# <kind> ∈ events | users | sessions | metric_completions | funnel_completions | questionnaire_responses
+# <grain> ∈ daily | hourly
+owlmetry stats <kind> <grain> (--project-id <id> | --team-id <id>) [--app-id <id>] [--days <n> | --hours <n> | --from <iso> --to <iso>] [--data-mode production|development|all] [--slug <slug>] [--include-current] --format json
+owlmetry stats backfill --team-id <id> --start <iso> --end <iso> [--grain daily|hourly] [--project-id <id>] [--notify] --format json
 ```
 
 ## Resource Management
@@ -546,6 +557,37 @@ owlmetry ads sync --project-id <id> --format json
 
 **Missing historical customers?** If a team just installed the SDK on an app where most paying customers already exist in RevenueCat, those users won't be in `app_users` yet — `revenuecat_sync` only refreshes rows the SDK (or RC webhooks) have already created. Run `owlmetry jobs trigger revenuecat_user_backfill --team-id <id> --project-id <id> --wait` to page every customer in the linked RC project and create/update `app_users` rows for each (sets subscriber state, lifetime USD revenue, ASA attribution properties; idempotent; anonymous RC IDs are skipped). After it finishes, re-run `ads sync` so attributed IDs resolve to names and the Advertising Insights page picks up the historical revenue.
 
+### Time-Series Rollups (Stats)
+
+Pre-aggregated daily + hourly counts backing dashboard sparklines and arbitrary trend queries. Eight underlying tables (`{events,metric_events,funnel_events,questionnaire_responses}_{daily,hourly}`) write one row per `(project, app, is_dev, bucket, kind-specific dimensions)` plus a `app_id IS NULL` project-rollup row whose distincts are project-level (a user active across two apps counts once in the rollup, twice across per-app rows). The aggregator re-aggregates the trailing 3 buckets on its hourly (`:05` UTC) and daily (`00:30` UTC) runs so late-arriving offline-mobile events still land in the right bucket; older gaps need a manual backfill. **The rollups are explicitly excluded from retention pruning and soft-delete cleanup** — counts are anonymous (no user / session IDs in the rows, only `COUNT` / `COUNT DISTINCT` integers), so year-views and long-tail sparklines survive after raw events have aged out.
+
+```bash
+owlmetry stats <kind> <grain> (--project-id <id> | --team-id <id>) [--app-id <id>] [--days <n> | --hours <n> | --from <iso> --to <iso>] [--data-mode production|development|all] [--slug <slug>] [--include-current] --format json
+```
+
+- **`<kind>`**: `events` | `users` | `sessions` | `metric_completions` | `funnel_completions` | `questionnaire_responses`. `users` and `sessions` are `COUNT(DISTINCT user_id)` / `COUNT(DISTINCT session_id)` per-bucket — **not summable across buckets** (a user active every day for a week counts seven times, not once). Plot them as a line; for true multi-bucket distincts fall back to raw-event scans.
+- **`<grain>`**: `daily` (UTC calendar `day`) or `hourly` (UTC start-of-hour `timestamptz`). Day boundaries are always UTC — no user-timezone setting.
+- **Scope**: pass exactly one of `--project-id` or `--team-id` (mutually exclusive; passing neither or both errors out). `--app-id` narrows to a single app within the chosen scope; omit it for the project rollup.
+- **Window**: `--days <n>` (default 30 for daily) or `--hours <n>` (default 24 for hourly) for a trailing window. Or pass explicit `--from <iso> --to <iso>` (both required; daily takes `YYYY-MM-DD`, hourly takes ISO 8601 hour). Explicit `from/to` overrides the trailing window.
+- **`--slug`**: required-ish for `metric_completions` / `funnel_completions` / `questionnaire_responses` when you want a single slug's series (otherwise the row is dimensional and you get every slug summed).
+- **`--include-current`**: by default the in-progress UTC bucket is dropped so a partial day or hour doesn't render as a misleading dip. Pass `--include-current` to include it (e.g. for a live "today so far" counter).
+- **Data mode**: `--data-mode production` (default), `development`, or `all`. Honoured by the rollup writes themselves (every bucket carries `is_dev`), so the toggle is a pure filter — no fan-out.
+
+Response shape (zero-padded — missing buckets render as `value: 0` so consumers can plot a continuous line without gap-fill logic):
+
+```json
+{ "kind": "events", "grain": "daily", "from": "2026-04-21", "to": "2026-05-20",
+  "data": [{ "bucket": "2026-04-21", "value": 1240 }, ...] }
+```
+
+**Backfill** — for first-time rollout (when an app already has months of raw events but the rollup tables are empty) or to repair a gap past the 3-bucket re-aggregation window:
+
+```bash
+owlmetry stats backfill --team-id <id> --start <iso> --end <iso> [--grain daily|hourly] [--project-id <id>] [--notify] --format json
+```
+
+This is a thin wrapper around `owlmetry jobs trigger stats_aggregate_daily` / `stats_aggregate_hourly` — same backing job, same idempotency. Each per-kind aggregator runs `DELETE` + two `INSERT … SELECT … GROUP BY` passes (per-app + project-rollup) inside a single transaction per bucket range, so re-running a backfill clears stale rows first — a row that disappeared at source (event later deleted, etc.) doesn't survive in the rollup. **Manual triggers are team-scoped** (`--team-id` required); omit `--project-id` to fan out across every project with activity in the range. `--start` / `--end` are inclusive; format is `YYYY-MM-DD` for `--grain daily` and ISO 8601 hour (`YYYY-MM-DDTHH:00`) for `--grain hourly`.
+
 ## Background Jobs
 
 Background jobs are asynchronous server-side tasks with progress tracking and email notifications. Use them for long-running operations like syncing data from third-party services.
@@ -622,6 +664,7 @@ For self-hosted instances, replace `api.owlmetry.com` with your server's domain.
 | Ratings | `list-app-ratings`, `list-ratings-by-country`, `sync-app-ratings` |
 | Integrations | `list-providers`, `list-integrations`, `add-integration`, `update-integration`, `remove-integration`, `copy-integration`, `sync-integration` |
 | Jobs | `list-jobs`, `get-job`, `trigger-job`, `cancel-job` |
+| Stats | `query-stats-bucketed` (daily / hourly time-series rollups for events / users / sessions / metric completions / funnel completions / questionnaire responses) |
 | Audit Logs | `list-audit-logs` |
 
 The server also exposes an `owlmetry://guide` resource with the operational guide (concepts, hierarchy, workflows).
