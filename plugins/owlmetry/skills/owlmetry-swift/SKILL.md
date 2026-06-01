@@ -373,7 +373,7 @@ One event with 12 attributes beats 12 events with one attribute each. For a clie
 
 The SDK auto-attaches a lot for free — don't re-emit any of these manually:
 
-- Device model, OS version, locale, `_connection` (wifi / cellular / offline), `app_version`, `build_number`, `is_dev`, `environment` (ios / ipados / macos / watchos) — on every event.
+- Device model, OS version, locale (shown `Locale.current`), `preferred_language` (the user's wanted language, `Locale.preferredLanguages.first` — powers the dashboard's Locales / localization-demand view), `supported_languages` (the app's shipped languages, `Bundle.main.localizations` — used to flag the localization gap), `_connection` (wifi / cellular / offline), `app_version`, `build_number`, `is_dev`, `environment` (ios / ipados / macos / watchos) — on every event.
 - `_http_method` / `_http_url` (query-stripped) / `_http_status` / `_http_duration_ms` / `_http_response_size` / `_http_error` — auto-captured for every completion-handler `URLSession` request via `networkTrackingEnabled` (default on).
 - `screenName` + `_duration_ms` — auto-captured per screen via `.owlScreen()`.
 

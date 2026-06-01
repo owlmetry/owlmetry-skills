@@ -272,6 +272,9 @@ owlmetry investigate <eventId> [--window <minutes>] --format json
 # Users
 owlmetry users <app-id> [--anonymous] [--real] [--search <query>] [--billing <tiers>] [--limit <n>] --format json
 
+# Locale demand (where to localize next — wanted language + country, flags languages the app doesn't ship yet)
+owlmetry locales [--project-id <id> | --team-id <id>] [--app-id <id>] --format json
+
 # Audit Logs
 owlmetry audit-log list --team-id <id> [--resource-type <type>] [--actor-id <id>] [--action <action>] [--since <time>] --format json
 
@@ -501,7 +504,15 @@ Output is a single chronological `events` array with `target_event_id` flagging 
 owlmetry users <app-id> [--anonymous] [--real] [--search <query>] [--billing <tiers>] [--limit <n>] --format json
 ```
 
-`--anonymous` and `--real` are mutually exclusive. `--billing` takes a comma-separated list of tiers (`paid`, `trial`, `free`) derived from RevenueCat-synced user properties — e.g. `--billing paid,trial` returns subscribers and trialists, omitting free users. Omitting the flag (or listing all three tiers) returns every tier. User rows include a `last_country_code` (most recent ingest country) rendered as a Country column and a `last_app_version` (most recent app version seen from that user) rendered as a Version column.
+`--anonymous` and `--real` are mutually exclusive. `--billing` takes a comma-separated list of tiers (`paid`, `trial`, `free`) derived from RevenueCat-synced user properties — e.g. `--billing paid,trial` returns subscribers and trialists, omitting free users. Omitting the flag (or listing all three tiers) returns every tier. User rows include a `last_country_code` (most recent ingest country) rendered as a Country column and a `last_app_version` (most recent app version seen from that user) rendered as a Version column. They also carry `last_locale` (shown locale) and `last_preferred_language` (the user's wanted language).
+
+### Locale demand
+
+```bash
+owlmetry locales [--project-id <id> | --team-id <id>] [--app-id <id>] --format json
+```
+
+Decides where to localize next. Returns `by_locale` (users grouped by their **wanted** language — device preferred language, e.g. `fr-FR`, `pt-BR` — each with a `shipped` flag) and `by_country` (works for every user today). Pass `--project-id` or `--app-id` to populate the shipped/gap flags (`shipped: false` = demand for a language the app doesn't ship yet); they're `null` across multiple apps. The language breakdown fills in as users upgrade to the SDK that reports preferred language — until then, lean on the country breakdown.
 
 ### Metric Events & Aggregation
 
