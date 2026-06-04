@@ -1,6 +1,6 @@
 {
   "name": "owlmetry",
-  "description": "Claude Code skills for OwlMetry — CLI, Node SDK, Swift SDK instrumentation",
+  "description": "Claude Code skills for OwlMetry — CLI, Node SDK, Swift SDK, and Android SDK instrumentation",
   "homepage": "https://owlmetry.com",
   "repository": "https://github.com/owlmetry/owlmetry-skills",
   "license": "MIT"
